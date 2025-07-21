@@ -1,0 +1,3 @@
+config/interfaces/*.yml
+!config/interfaces/example*.yml
+data/

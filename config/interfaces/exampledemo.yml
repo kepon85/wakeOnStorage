@@ -1,0 +1,44 @@
+interface:
+  name: Demo Interface
+  logo: /favicon.ico
+  css:
+    - /css/custom.css
+  js_include:
+    - /js/custom.js
+auth:
+  method:
+    - none
+storage:
+  conso: 10
+  wake_time:
+    - 1
+    - 2
+  check:
+    methode: port
+    param:
+      host: localhost
+      port: 80
+  up:
+    methode: api
+    param:
+      url: http://example.com/up
+      method: POST
+      expected_result:
+        status_code: 200
+    time: 60
+    timeout: 120
+    post_up:
+      methode: text
+      content: "<p>Storage is up</p>"
+  down:
+    methode: api
+    param:
+      url: http://example.com/down
+      method: POST
+      expected_result:
+        status_code: 200
+    time: 60
+    timeout: 120
+    post:
+      methode: text
+      content: "<p>Storage is down</p>"
