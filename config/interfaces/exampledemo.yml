@@ -9,7 +9,13 @@ auth:
   method:
     - uniq
   uniq:
-    password: demo
+    password_hash: "$2y$12$zdqst7kiZMBwnAIrbUm2IeT6mRpk5IPVcObWgaNkeGDOQK6oScQrm" # hashed with PHP password_hash
+#  file:
+#    path: /path/to/passwd.txt     # lines formatted "user:password"
+#  imap:
+#    server: imap.example.com
+#    port: 993
+#    secure: ssl
 storage:
   conso: 10
   wake_time:

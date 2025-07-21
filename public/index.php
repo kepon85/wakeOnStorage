@@ -45,6 +45,9 @@ function wos_check_imap($cfg, $user, $pass) {
 }
 
 function wos_check_uniq($cfg, $pass) {
+    if (!empty($cfg['uniq']['password_hash'])) {
+        return password_verify($pass, $cfg['uniq']['password_hash']);
+    }
     return $pass === ($cfg['uniq']['password'] ?? '');
 }
 
