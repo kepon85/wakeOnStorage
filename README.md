@@ -80,6 +80,24 @@ Global settings are stored in `config/global.yml`. Per-domain configurations are
 located in `config/interfaces/`. Only files prefixed with `example` are tracked
 in Git to avoid leaking secrets.
 
+## Data sources
+
+`public/api.php` exposes various data points used by the interfaces. Each source
+is configured under the `data` section of `config/global.yml` with a refresh
+interval declared in `ajax:`. Responses are cached in the SQLite database.
+
+Available sources:
+
+- **batterie** – current battery level read from Home&nbsp;Assistant.
+- **production_solaire** – live solar production value from Home&nbsp;Assistant.
+- **production_solaire_estimation** – forecast from Solcast. Only the portion
+  between now and the next sunset is returned. If the request happens at night,
+  the period between the next sunrise and sunset is used instead.
+
+Each entry defines the API URL, bearer token and cache lifetime (TTL). When the
+cache is older than the TTL the API is queried again; otherwise the stored value
+is returned.
+
 ## Running
 Use PHP's built-in server for local testing:
 
