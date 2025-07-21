@@ -89,3 +89,18 @@ php -S localhost:8000 -t public
 
 Navigate to `http://localhost:8000` or the appropriate virtual host to access
 the interface.
+
+## Development
+
+Install dependencies with Composer:
+
+```bash
+composer install
+```
+
+Utility scripts are provided in `bin/`:
+
+- `bin/generate-password` creates a random password and prints the YAML line to
+  add under `auth.uniq.password_hash`.
+- `bin/add-user <file> <username> [password]` hashes the password and appends it
+  to the specified credentials file.
