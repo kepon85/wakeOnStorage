@@ -28,7 +28,8 @@ if ($now - $routerSince >= $routerRefresh) {
         if (($rc['methode'] ?? '') === 'ping') {
             $hostCheck = $rc['host'] ?? 'localhost';
             $count = (int)($rc['count'] ?? 1);
-            $routerAvailable = Router::ping($hostCheck, $count);
+            $timeout = (int)($rc['timeout'] ?? 1);
+            $routerAvailable = Router::ping($hostCheck, $count, $timeout);
         }
     }
     if (!$routerAvailable) {

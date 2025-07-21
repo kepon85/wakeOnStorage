@@ -17,7 +17,7 @@ if (!file_exists($file)) {
 
 $cfg = Yaml::parseFile($file);
 
-
+$wakeTimes = $cfg['storage']['wake_time'] ?? [];
 
 $dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
 $dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
@@ -145,15 +145,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
     <h1 class="h4"><?= htmlspecialchars($cfg['interface']['name'] ?? '') ?></h1>
   </header>
 
+  <div id="notifications" class="position-fixed top-0 end-0 p-3" style="z-index:1051;"></div>
   <?php if ($message): ?>
-  <div class="alert alert-info"><?= htmlspecialchars($message) ?></div>
+  <script>var initialMessage = <?= json_encode($message) ?>;</script>
   <?php endif; ?>
 
-  <div id="router-warning" class="alert alert-warning d-none"></div>
   <form id="router-plan" method="post" class="mb-3 d-none">
     <div class="mb-3">
-      <label class="form-label">Allumer jusqu'à</label>
-      <input type="time" name="router_end" class="form-control" required>
+      <label class="form-label">Durée d'allumage</label>
+      <select name="router_end" class="form-select">
+        <?php foreach ($wakeTimes as $t): ?>
+        <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?>h</option>
+        <?php endforeach; ?>
+      </select>
     </div>
     <button type="submit" name="schedule_router" class="btn btn-primary">Planifier l'allumage</button>
   </form>
@@ -171,13 +175,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
 var refreshInterval = <?= $refresh ?> * 1000;
 var routerSince = 0;
 
+function notify(type, text, life) {
+  var cls = type === 'warn' ? 'warning' : 'info';
+  var div = $('<div>').addClass('alert alert-' + cls).css('cursor','pointer').text(text);
+  div.appendTo('#notifications').on('click', function() { $(this).remove(); });
+  if (life === undefined) life = 3000;
+  if (life > 0) {
+    setTimeout(function() { div.fadeOut(200, function(){ $(this).remove(); }); }, life);
+  }
+  return div;
+}
+if (typeof initialMessage !== 'undefined') {
+  notify('info', initialMessage);
+}
+var routerNote = null;
+
 function updateAll() {
   $.getJSON('api.php', { router_since: routerSince }, function(data) {
     if (data.router_timestamp) {
       routerSince = data.router_timestamp;
     }
     if (data.router) {
-      var warn = $('#router-warning');
+
       var plan = $('#router-plan');
       var actions = $('#router-actions');
       if (data.router.available === false) {
@@ -185,11 +204,12 @@ function updateAll() {
         if (data.router.next) {
           msg += ' - prochain allumage ' + data.router.next;
         }
-        warn.text(msg).removeClass('d-none');
+        if (!routerNote) routerNote = notify('warn', msg, 0); else routerNote.text(msg);
         plan.removeClass('d-none');
         actions.addClass('d-none');
       } else {
-        warn.addClass('d-none');
+        if (routerNote) { routerNote.remove(); routerNote = null; }
+
         plan.addClass('d-none');
         actions.removeClass('d-none');
       }

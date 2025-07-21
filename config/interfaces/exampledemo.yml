@@ -16,6 +16,7 @@ router:
     methode: ping
     host: 192.168.1.1
     count: 1
+    timeout: 1
   router_up:
     - "09:00"
     - "12:00"
