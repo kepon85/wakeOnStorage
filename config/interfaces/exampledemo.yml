@@ -9,7 +9,6 @@ auth:
   method:
     - uniq
   uniq:
-#    password: demo               # plain text example
     password_hash: "$2y$12$zdqst7kiZMBwnAIrbUm2IeT6mRpk5IPVcObWgaNkeGDOQK6oScQrm" # hashed with PHP password_hash
 #  file:
 #    path: /path/to/passwd.txt     # lines formatted "user:password"
