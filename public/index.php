@@ -226,6 +226,7 @@ function updateAll() {
         actions.removeClass('d-none');
       }
     }
+
     if (data.battery_timestamp) { batterySince = data.battery_timestamp; }
     if (data.solar_timestamp) { solarSince = data.solar_timestamp; }
     if (data.forecast_timestamp) { forecastSince = data.forecast_timestamp; }
