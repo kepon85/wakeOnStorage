@@ -19,8 +19,6 @@ $cfg = Yaml::parseFile($file);
 
 $wakeTimes = $cfg['storage']['wake_time'] ?? [];
 
-
-
 $dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
 $dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
 $pdo = new PDO('sqlite:' . $dbPath);
@@ -198,6 +196,7 @@ function updateAll() {
       routerSince = data.router_timestamp;
     }
     if (data.router) {
+
       var plan = $('#router-plan');
       var actions = $('#router-actions');
       if (data.router.available === false) {
@@ -210,6 +209,7 @@ function updateAll() {
         actions.addClass('d-none');
       } else {
         if (routerNote) { routerNote.remove(); routerNote = null; }
+
         plan.addClass('d-none');
         actions.removeClass('d-none');
       }
