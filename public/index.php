@@ -1,8 +1,12 @@
 <?php
 session_start();
-require_once __DIR__ . '/../lib/yaml.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 
-$global = yaml_parse_simple(__DIR__ . '/../config/global.yml');
+use Symfony\Component\Yaml\Yaml;
+use WakeOnStorage\Auth;
+use WakeOnStorage\Logger;
+
+$global = Yaml::parseFile(__DIR__ . '/../config/global.yml');
 $host = $_SERVER['HTTP_HOST'] ?? 'default';
 $host = preg_replace('/:\d+$/', '', $host);
 $configDir = __DIR__ . '/../' . ($global['interface_config_dir'] ?? 'config/interfaces');
@@ -11,7 +15,7 @@ if (!file_exists($file)) {
     $file = "$configDir/exampledemo.yml"; // fallback
 }
 
-$cfg = yaml_parse_simple($file);
+$cfg = Yaml::parseFile($file);
 
 $dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
 $dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
@@ -25,61 +29,18 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS events (
     ip TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 )");
-
-function wos_log_event($pdo, $host, $action, $user = null) {
-    $stmt = $pdo->prepare("INSERT INTO events (host, action, user, ip) VALUES (?,?,?,?)");
-    $stmt->execute([$host, $action, $user, $_SERVER['REMOTE_ADDR'] ?? '']);
-}
-
-
-// --- Authentication handling ---
 $authMethods = $cfg['auth']['method'] ?? ['none'];
 $authKey = 'wos_auth_' . $host;
 $authenticatedUser = $_SESSION[$authKey] ?? null;
 $error = null;
 
-function wos_check_file($path, $user, $pass) {
-    if (!$path || !file_exists($path)) return false;
-    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($lines as $l) {
-        if (strpos($l, ':') !== false) {
-            list($u, $p) = array_map('trim', explode(':', $l, 2));
-            if ($u === $user) {
-                if (password_verify($pass, $p) || $p === $pass) {
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
-}
 
-function wos_check_imap($cfg, $user, $pass) {
-    if (!extension_loaded('imap')) return false;
-    $server = $cfg['imap']['server'] ?? 'localhost';
-    $port = $cfg['imap']['port'] ?? 143;
-    $secure = $cfg['imap']['secure'] ?? '';
-    $mailbox = '{' . $server . ':' . $port;
-    if ($secure === 'ssl') $mailbox .= '/ssl';
-    elseif ($secure === 'tls') $mailbox .= '/tls';
-    $mailbox .= '}INBOX';
-    $imap = @imap_open($mailbox, $user, $pass);
-    if ($imap) { imap_close($imap); return true; }
-    return false;
-}
-
-function wos_check_uniq($cfg, $pass) {
-    if (!empty($cfg['uniq']['password_hash'])) {
-        return password_verify($pass, $cfg['uniq']['password_hash']);
-    }
-    return $pass === ($cfg['uniq']['password'] ?? '');
-}
 
 if (!$authenticatedUser) {
     if (in_array('none', $authMethods)) {
         $authenticatedUser = 'guest';
         $_SESSION[$authKey] = $authenticatedUser;
-        wos_log_event($pdo, $host, 'login_success', 'guest');
+        Logger::logEvent($pdo, $host, 'login_success', 'guest');
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
         $user = $_POST['username'] ?? '';
         $pass = $_POST['password'] ?? '';
@@ -87,13 +48,13 @@ if (!$authenticatedUser) {
         foreach ($authMethods as $m) {
             switch ($m) {
                 case 'uniq':
-                    if (wos_check_uniq($cfg['auth'], $pass)) { $ok = true; $user = 'uniq'; }
+                    if (Auth::checkUniq($cfg['auth'], $pass)) { $ok = true; $user = 'uniq'; }
                     break;
                 case 'file':
-                    if (wos_check_file($cfg['auth']['file']['path'] ?? '', $user, $pass)) $ok = true;
+                    if (Auth::checkFile($cfg['auth']['file']['path'] ?? '', $user, $pass)) $ok = true;
                     break;
                 case 'imap':
-                    if (wos_check_imap($cfg['auth'], $user, $pass)) $ok = true;
+                    if (Auth::checkImap($cfg['auth'], $user, $pass)) $ok = true;
                     break;
             }
             if ($ok) break;
@@ -101,11 +62,11 @@ if (!$authenticatedUser) {
         if ($ok) {
             session_regenerate_id(true);
             $_SESSION[$authKey] = $user ?: true;
-            wos_log_event($pdo, $host, 'login_success', $user ?: '');
+            Logger::logEvent($pdo, $host, 'login_success', $user ?: '');
             header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?'));
             exit;
         } else {
-            wos_log_event($pdo, $host, 'login_fail', $user);
+            Logger::logEvent($pdo, $host, 'login_fail', $user);
             $error = 'Invalid credentials';
         }
     }
@@ -148,7 +109,7 @@ if (!$authenticatedUser) {
 $action = $_GET['action'] ?? null;
 $message = '';
 if ($action === 'up' || $action === 'down') {
-    wos_log_event($pdo, $host, $action, $authenticatedUser);
+    Logger::logEvent($pdo, $host, $action, $authenticatedUser);
     $message = $action === 'up' ? 'Storage started' : 'Storage stopped';
 }
 ?>
