@@ -6,3 +6,5 @@ data/
 outils_hebergement/
 stats/
 vendor/
+composer.lock
+var/
