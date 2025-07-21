@@ -1,0 +1,53 @@
+interface:
+  name: Demo Interface
+  logo: /favicon.ico
+  css:
+    - /css/custom.css
+  js_include:
+    - /js/custom.js
+auth:
+  method:
+    - uniq
+  uniq:
+#    password: demo               # plain text example
+    password_hash: "$2y$12$zdqst7kiZMBwnAIrbUm2IeT6mRpk5IPVcObWgaNkeGDOQK6oScQrm" # hashed with PHP password_hash
+#  file:
+#    path: /path/to/passwd.txt     # lines formatted "user:password"
+#  imap:
+#    server: imap.example.com
+#    port: 993
+#    secure: ssl
+storage:
+  conso: 10
+  wake_time:
+    - 1
+    - 2
+  check:
+    methode: port
+    param:
+      host: localhost
+      port: 80
+  up:
+    methode: api
+    param:
+      url: http://example.com/up
+      method: POST
+      expected_result:
+        status_code: 200
+    time: 60
+    timeout: 120
+    post_up:
+      methode: text
+      content: "<p>Storage is up</p>"
+  down:
+    methode: api
+    param:
+      url: http://example.com/down
+      method: POST
+      expected_result:
+        status_code: 200
+    time: 60
+    timeout: 120
+    post:
+      methode: text
+      content: "<p>Storage is down</p>"
