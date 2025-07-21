@@ -10,6 +10,19 @@ auth:
     - uniq
   uniq:
     password_hash: "$2y$12$zdqst7kiZMBwnAIrbUm2IeT6mRpk5IPVcObWgaNkeGDOQK6oScQrm" # hashed with PHP password_hash
+# Router configuration example
+router:
+  router_check:
+    methode: ping
+    host: 192.168.1.1
+    count: 1
+  router_up:
+    - "09:00"
+    - "12:00"
+
+ajax:
+  refresh: 10
+  router_refresh: 10
 #  file:
 #    path: /path/to/passwd.txt     # lines formatted "user:password"
 #  imap:
