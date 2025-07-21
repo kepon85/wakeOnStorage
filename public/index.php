@@ -17,6 +17,10 @@ if (!file_exists($file)) {
 
 $cfg = Yaml::parseFile($file);
 
+$wakeTimes = $cfg['storage']['wake_time'] ?? [];
+
+
+
 $dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
 $dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
 $pdo = new PDO('sqlite:' . $dbPath);
@@ -112,6 +116,17 @@ if ($action === 'up' || $action === 'down') {
     Logger::logEvent($pdo, $host, $action, $authenticatedUser);
     $message = $action === 'up' ? 'Storage started' : 'Storage stopped';
 }
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
+    $end = $_POST['router_end'] ?? '';
+    Logger::logEvent($pdo, $host, 'router_schedule', $authenticatedUser);
+    $to = $global['contact_admin']['email'] ?? '';
+    if ($to) {
+        $subject = '[WOS] Planification routeur';
+        $body = "Utilisateur $authenticatedUser a demande l'allumage du routeur sur $host jusqu'a $end.";
+        @mail($to, $subject, $body);
+    }
+    $message = 'Planification envoy\xC3\xA9e';
+}
 ?>
 <!DOCTYPE html>
 <html>
@@ -132,11 +147,23 @@ if ($action === 'up' || $action === 'down') {
     <h1 class="h4"><?= htmlspecialchars($cfg['interface']['name'] ?? '') ?></h1>
   </header>
 
+  <div id="notifications" class="position-fixed top-0 end-0 p-3" style="z-index:1051;"></div>
   <?php if ($message): ?>
-  <div class="alert alert-info"><?= htmlspecialchars($message) ?></div>
+  <script>var initialMessage = <?= json_encode($message) ?>;</script>
   <?php endif; ?>
 
-  <div class="mb-3">
+  <form id="router-plan" method="post" class="mb-3 d-none">
+    <div class="mb-3">
+      <label class="form-label">Durée d'allumage</label>
+      <select name="router_end" class="form-select">
+        <?php foreach ($wakeTimes as $t): ?>
+        <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?>h</option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <button type="submit" name="schedule_router" class="btn btn-primary">Planifier l'allumage</button>
+  </form>
+  <div id="router-actions" class="mb-3 d-none">
     <a class="btn btn-success" href="?action=up">Allumer</a>
     <a class="btn btn-danger" href="?action=down">Eteindre</a>
   </div>
@@ -144,5 +171,54 @@ if ($action === 'up' || $action === 'down') {
 <?php if (!empty($cfg['interface']['js_include'])): foreach ($cfg['interface']['js_include'] as $js): ?>
 <script src="<?= htmlspecialchars($js) ?>"></script>
 <?php endforeach; endif; ?>
+<?php $refresh = (int)($global['ajax']['refresh'] ?? 10); ?>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script>
+var refreshInterval = <?= $refresh ?> * 1000;
+var routerSince = 0;
+
+function notify(type, text, life) {
+  var cls = type === 'warn' ? 'warning' : 'info';
+  var div = $('<div>').addClass('alert alert-' + cls).css('cursor','pointer').text(text);
+  div.appendTo('#notifications').on('click', function() { $(this).remove(); });
+  if (life === undefined) life = 3000;
+  if (life > 0) {
+    setTimeout(function() { div.fadeOut(200, function(){ $(this).remove(); }); }, life);
+  }
+  return div;
+}
+if (typeof initialMessage !== 'undefined') {
+  notify('info', initialMessage);
+}
+var routerNote = null;
+
+function updateAll() {
+  $.getJSON('api.php', { router_since: routerSince }, function(data) {
+    if (data.router_timestamp) {
+      routerSince = data.router_timestamp;
+    }
+    if (data.router) {
+      var plan = $('#router-plan');
+      var actions = $('#router-actions');
+      if (data.router.available === false) {
+        var msg = 'Routeur injoignable';
+        if (data.router.next) {
+          msg += ' - prochain allumage ' + data.router.next;
+        }
+        if (!routerNote) routerNote = notify('warn', msg, 0); else routerNote.text(msg);
+        plan.removeClass('d-none');
+        actions.addClass('d-none');
+      } else {
+        if (routerNote) { routerNote.remove(); routerNote = null; }
+        plan.addClass('d-none');
+        actions.removeClass('d-none');
+      }
+    }
+  }).always(function() {
+    setTimeout(updateAll, refreshInterval);
+  });
+}
+$(updateAll);
+</script>
 </body>
 </html>
