@@ -30,6 +30,7 @@ router:  # Ce paramètre peut être commun (fichier de conf général mais il es
 		methode: ping
 			host: nas.retzo.net
 			count: 1 	# Nombre de ping à testé
+			timeout: 1      # Timeout en secondes pour le ping
 	router_up : # Fréquence d'allumage du routeur (si éteint - commenté = toujours allumé)
 		- 09:00
 		- 12:00
