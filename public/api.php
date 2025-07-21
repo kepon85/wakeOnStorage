@@ -4,7 +4,42 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use Symfony\Component\Yaml\Yaml;
 use WakeOnStorage\Router;
 
-$global = Yaml::parseFile(__DIR__ . '/../config/global.yml');
+function http_get_json(string $url, array $headers = [], int $timeout = 5): ?array {
+    $opts = [
+        'http' => [
+            'method' => 'GET',
+            'header' => implode("\r\n", $headers),
+            'timeout' => $timeout,
+        ],
+    ];
+    $context = stream_context_create($opts);
+    $res = @file_get_contents($url, false, $context);
+    if ($res === false) {
+        return null;
+    }
+    return json_decode($res, true);
+}
+
+function cache_fetch(PDO $pdo, string $key, callable $callback, int $ttl): ?array {
+    $stmt = $pdo->prepare('SELECT value, updated_at FROM data_cache WHERE key=?');
+    $stmt->execute([$key]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($row && time() - (int)$row['updated_at'] < $ttl) {
+        return json_decode($row['value'], true);
+    }
+    $data = $callback();
+    if ($data !== null) {
+        $stmt = $pdo->prepare('REPLACE INTO data_cache (key, value, updated_at) VALUES (?,?,?)');
+        $stmt->execute([$key, json_encode($data), time()]);
+    }
+    return $data;
+}
+
+$global = Yaml::parseFile(__DIR__ . '/../config/global-default.yml');
+$override = __DIR__ . '/../config/global.yml';
+if (file_exists($override)) {
+    $global = array_replace_recursive($global, Yaml::parseFile($override));
+}
 $host = $_SERVER['HTTP_HOST'] ?? 'default';
 $host = preg_replace('/:\d+$/', '', $host);
 $configDir = __DIR__ . '/../' . ($global['interface_config_dir'] ?? 'config/interfaces');
@@ -14,9 +49,21 @@ if (!file_exists($file)) {
 }
 $cfg = Yaml::parseFile($file);
 
+$dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
+$dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
+$pdo = new PDO('sqlite:' . $dbPath);
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$pdo->exec("CREATE TABLE IF NOT EXISTS data_cache (key TEXT PRIMARY KEY, value TEXT, updated_at INTEGER)");
+
 $now = time();
 $routerSince = isset($_GET['router_since']) ? (int)$_GET['router_since'] : 0;
 $routerRefresh = (int)($global['ajax']['router_refresh'] ?? 10);
+$batterySince = isset($_GET['battery_since']) ? (int)$_GET['battery_since'] : 0;
+$batteryRefresh = (int)($global['ajax']['batterie_refresh'] ?? 600);
+$solarSince = isset($_GET['solar_since']) ? (int)$_GET['solar_since'] : 0;
+$solarRefresh = (int)($global['ajax']['production_solaire_refresh'] ?? 600);
+$forecastSince = isset($_GET['forecast_since']) ? (int)$_GET['forecast_since'] : 0;
+$forecastRefresh = (int)($global['ajax']['production_solaire_estimation_refresh'] ?? 1800);
 
 $result = ['timestamp' => $now];
 
@@ -40,6 +87,88 @@ if ($now - $routerSince >= $routerRefresh) {
         'next' => $nextRouter,
     ];
     $result['router_timestamp'] = $now;
+}
+
+if ($now - $batterySince >= $batteryRefresh && !empty($global['data']['batterie'][0])) {
+    $cfgBat = $global['data']['batterie'][0];
+    $ttl = (int)($cfgBat['ttl'] ?? 0);
+    $data = cache_fetch($pdo, 'batterie0', function() use ($cfgBat) {
+        $headers = ['Content-Type: application/json'];
+        if (!empty($cfgBat['token'])) {
+            $headers[] = 'Authorization: Bearer ' . $cfgBat['token'];
+        }
+        return http_get_json($cfgBat['url'], $headers);
+    }, $ttl);
+    $value = $data['state'] ?? null;
+    $result['batterie'] = [$value !== null ? $value : 'NA'];
+    $result['battery_timestamp'] = $now;
+}
+
+if ($now - $solarSince >= $solarRefresh && !empty($global['data']['production_solaire'])) {
+    $cfgSolar = $global['data']['production_solaire'];
+    $ttl = (int)($cfgSolar['ttl'] ?? 0);
+    $data = cache_fetch($pdo, 'production_solaire', function() use ($cfgSolar) {
+        $headers = ['Content-Type: application/json'];
+        if (!empty($cfgSolar['token'])) {
+            $headers[] = 'Authorization: Bearer ' . $cfgSolar['token'];
+        }
+        return http_get_json($cfgSolar['url'], $headers);
+    }, $ttl);
+    $value = $data['state'] ?? null;
+    $result['production_solaire'] = $value !== null ? $value : 'NA';
+    $result['solar_timestamp'] = $now;
+}
+
+if ($now - $forecastSince >= $forecastRefresh && !empty($global['data']['production_solaire_estimation'])) {
+    $cfgFor = $global['data']['production_solaire_estimation'];
+    $ttl = (int)($cfgFor['ttl'] ?? 0);
+    $raw = cache_fetch($pdo, 'production_solaire_estimation', function() use ($cfgFor) {
+        $headers = ['Content-Type: application/json'];
+        if (!empty($cfgFor['token'])) {
+            $headers[] = 'Authorization: Bearer ' . $cfgFor['token'];
+        }
+        return http_get_json($cfgFor['url'], $headers);
+    }, $ttl);
+    $forecast = [];
+    if ($raw && !empty($raw['forecasts'])) {
+        $nowTs = time();
+        $start = null;
+        foreach ($raw['forecasts'] as $f) {
+            $ts = strtotime($f['period_end'] ?? '');
+            $val = $f['pv_estimate'] ?? 0;
+            if ($ts === false) continue;
+            if ($start === null) {
+                if ($ts >= $nowTs && $val > 0) {
+                    $start = true;
+                } else {
+                    continue;
+                }
+            }
+            if ($start && $val <= 0 && $ts > $nowTs) {
+                break;
+            }
+            if ($start) {
+                if ($ts >= $nowTs) {
+                    $forecast[] = ['period_end' => $f['period_end'], 'pv_estimate' => $val];
+                }
+            }
+        }
+        if (!$forecast) {
+            $start = false;
+            foreach ($raw['forecasts'] as $f) {
+                $ts = strtotime($f['period_end'] ?? '');
+                $val = $f['pv_estimate'] ?? 0;
+                if ($ts === false) continue;
+                if (!$start && $val > 0) { $start = true; }
+                if ($start) {
+                    $forecast[] = ['period_end' => $f['period_end'], 'pv_estimate' => $val];
+                    if ($val <= 0 && count($forecast) > 1) break;
+                }
+            }
+        }
+    }
+    $result['production_solaire_estimation'] = $forecast ?: 'NA';
+    $result['forecast_timestamp'] = $now;
 }
 
 header('Content-Type: application/json');
