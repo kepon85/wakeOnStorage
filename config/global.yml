@@ -9,3 +9,8 @@ data:
 interface_config_dir: config/interfaces
 
 db_path: data/wakeonstorage.sqlite
+
+# Refresh interval (seconds) for AJAX calls (seconds)
+ajax:
+  refresh: 10          # general polling interval
+  router_refresh: 10   # router status refresh interval

@@ -17,6 +17,8 @@ if (!file_exists($file)) {
 
 $cfg = Yaml::parseFile($file);
 
+
+
 $dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
 $dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
 $pdo = new PDO('sqlite:' . $dbPath);
@@ -112,6 +114,17 @@ if ($action === 'up' || $action === 'down') {
     Logger::logEvent($pdo, $host, $action, $authenticatedUser);
     $message = $action === 'up' ? 'Storage started' : 'Storage stopped';
 }
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
+    $end = $_POST['router_end'] ?? '';
+    Logger::logEvent($pdo, $host, 'router_schedule', $authenticatedUser);
+    $to = $global['contact_admin']['email'] ?? '';
+    if ($to) {
+        $subject = '[WOS] Planification routeur';
+        $body = "Utilisateur $authenticatedUser a demande l'allumage du routeur sur $host jusqu'a $end.";
+        @mail($to, $subject, $body);
+    }
+    $message = 'Planification envoy\xC3\xA9e';
+}
 ?>
 <!DOCTYPE html>
 <html>
@@ -136,7 +149,15 @@ if ($action === 'up' || $action === 'down') {
   <div class="alert alert-info"><?= htmlspecialchars($message) ?></div>
   <?php endif; ?>
 
-  <div class="mb-3">
+  <div id="router-warning" class="alert alert-warning d-none"></div>
+  <form id="router-plan" method="post" class="mb-3 d-none">
+    <div class="mb-3">
+      <label class="form-label">Allumer jusqu'à</label>
+      <input type="time" name="router_end" class="form-control" required>
+    </div>
+    <button type="submit" name="schedule_router" class="btn btn-primary">Planifier l'allumage</button>
+  </form>
+  <div id="router-actions" class="mb-3 d-none">
     <a class="btn btn-success" href="?action=up">Allumer</a>
     <a class="btn btn-danger" href="?action=down">Eteindre</a>
   </div>
@@ -144,5 +165,40 @@ if ($action === 'up' || $action === 'down') {
 <?php if (!empty($cfg['interface']['js_include'])): foreach ($cfg['interface']['js_include'] as $js): ?>
 <script src="<?= htmlspecialchars($js) ?>"></script>
 <?php endforeach; endif; ?>
+<?php $refresh = (int)($global['ajax']['refresh'] ?? 10); ?>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script>
+var refreshInterval = <?= $refresh ?> * 1000;
+var routerSince = 0;
+
+function updateAll() {
+  $.getJSON('api.php', { router_since: routerSince }, function(data) {
+    if (data.router_timestamp) {
+      routerSince = data.router_timestamp;
+    }
+    if (data.router) {
+      var warn = $('#router-warning');
+      var plan = $('#router-plan');
+      var actions = $('#router-actions');
+      if (data.router.available === false) {
+        var msg = 'Routeur injoignable';
+        if (data.router.next) {
+          msg += ' - prochain allumage ' + data.router.next;
+        }
+        warn.text(msg).removeClass('d-none');
+        plan.removeClass('d-none');
+        actions.addClass('d-none');
+      } else {
+        warn.addClass('d-none');
+        plan.addClass('d-none');
+        actions.removeClass('d-none');
+      }
+    }
+  }).always(function() {
+    setTimeout(updateAll, refreshInterval);
+  });
+}
+$(updateAll);
+</script>
 </body>
 </html>
