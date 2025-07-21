@@ -10,7 +10,27 @@ $file = "$configDir/{$host}.yml";
 if (!file_exists($file)) {
     $file = "$configDir/exampledemo.yml"; // fallback
 }
+
 $cfg = yaml_parse_simple($file);
+
+$dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
+$dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
+$pdo = new PDO('sqlite:' . $dbPath);
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$pdo->exec("CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    host TEXT,
+    action TEXT,
+    user TEXT,
+    ip TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)");
+
+function wos_log_event($pdo, $host, $action, $user = null) {
+    $stmt = $pdo->prepare("INSERT INTO events (host, action, user, ip) VALUES (?,?,?,?)");
+    $stmt->execute([$host, $action, $user, $_SERVER['REMOTE_ADDR'] ?? '']);
+}
+
 
 // --- Authentication handling ---
 $authMethods = $cfg['auth']['method'] ?? ['none'];
@@ -24,7 +44,11 @@ function wos_check_file($path, $user, $pass) {
     foreach ($lines as $l) {
         if (strpos($l, ':') !== false) {
             list($u, $p) = array_map('trim', explode(':', $l, 2));
-            if ($u === $user && $p === $pass) return true;
+            if ($u === $user) {
+                if (password_verify($pass, $p) || $p === $pass) {
+                    return true;
+                }
+            }
         }
     }
     return false;
@@ -55,6 +79,7 @@ if (!$authenticatedUser) {
     if (in_array('none', $authMethods)) {
         $authenticatedUser = 'guest';
         $_SESSION[$authKey] = $authenticatedUser;
+        wos_log_event($pdo, $host, 'login_success', 'guest');
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
         $user = $_POST['username'] ?? '';
         $pass = $_POST['password'] ?? '';
@@ -74,10 +99,13 @@ if (!$authenticatedUser) {
             if ($ok) break;
         }
         if ($ok) {
+            session_regenerate_id(true);
             $_SESSION[$authKey] = $user ?: true;
+            wos_log_event($pdo, $host, 'login_success', $user ?: '');
             header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?'));
             exit;
         } else {
+            wos_log_event($pdo, $host, 'login_fail', $user);
             $error = 'Invalid credentials';
         }
     }
@@ -117,24 +145,10 @@ if (!$authenticatedUser) {
     exit;
 }
 
-$dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
-$dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
-$pdo = new PDO('sqlite:' . $dbPath);
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$pdo->exec("CREATE TABLE IF NOT EXISTS events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    host TEXT,
-    action TEXT,
-    user TEXT,
-    ip TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-)");
-
 $action = $_GET['action'] ?? null;
 $message = '';
 if ($action === 'up' || $action === 'down') {
-    $stmt = $pdo->prepare("INSERT INTO events (host, action, user, ip) VALUES (?,?,?,?)");
-    $stmt->execute([$host, $action, $authenticatedUser, $_SERVER['REMOTE_ADDR'] ?? '']);
+    wos_log_event($pdo, $host, $action, $authenticatedUser);
     $message = $action === 'up' ? 'Storage started' : 'Storage stopped';
 }
 ?>
