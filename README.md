@@ -33,7 +33,8 @@ auth:
 
 ### file
 Credentials are read from a flat file containing `user:password` pairs, one per
-line.
+line. The password value can be stored in plain text or as a hash generated with
+`password_hash`. Hashed values are checked with `password_verify`.
 
 ```yaml
 auth:
@@ -41,6 +42,7 @@ auth:
     - file
   file:
     path: /path/to/passwd.txt
+    # each line: "user:password" where password may be a hash
 ```
 
 ### imap
