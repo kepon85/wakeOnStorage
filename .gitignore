@@ -1,5 +1,7 @@
 config/interfaces/*.yml
 !config/interfaces/example*.yml
+config/global.yml
+!config/global-default.yml
 data/
 outils_hebergement/
 stats/

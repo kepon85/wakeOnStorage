@@ -76,14 +76,16 @@ auth:
 ```
 
 ## Configuration
-Global settings are stored in `config/global.yml`. Per-domain configurations are
-located in `config/interfaces/`. Only files prefixed with `example` are tracked
-in Git to avoid leaking secrets.
+Global defaults are stored in `config/global-default.yml`. You may create a
+`config/global.yml` file to override specific values locally. Per-domain
+configurations are located in `config/interfaces/`. Only files prefixed with
+`example` are tracked in Git to avoid leaking secrets.
 
 ## Data sources
 
 `public/api.php` exposes various data points used by the interfaces. Each source
-is configured under the `data` section of `config/global.yml` with a refresh
+is configured under the `data` section of the merged `global-default.yml`/`global.yml`
+configuration with a refresh
 interval declared in `ajax:`. Responses are cached in the SQLite database.
 
 Available sources:
