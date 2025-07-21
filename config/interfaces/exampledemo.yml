@@ -7,7 +7,9 @@ interface:
     - /js/custom.js
 auth:
   method:
-    - none
+    - uniq
+  uniq:
+    password: demo
 storage:
   conso: 10
   wake_time:
