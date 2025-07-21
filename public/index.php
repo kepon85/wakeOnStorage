@@ -6,7 +6,11 @@ use Symfony\Component\Yaml\Yaml;
 use WakeOnStorage\Auth;
 use WakeOnStorage\Logger;
 
-$global = Yaml::parseFile(__DIR__ . '/../config/global.yml');
+$global = Yaml::parseFile(__DIR__ . '/../config/global-default.yml');
+$override = __DIR__ . '/../config/global.yml';
+if (file_exists($override)) {
+    $global = array_replace_recursive($global, Yaml::parseFile($override));
+}
 $host = $_SERVER['HTTP_HOST'] ?? 'default';
 $host = preg_replace('/:\d+$/', '', $host);
 $configDir = __DIR__ . '/../' . ($global['interface_config_dir'] ?? 'config/interfaces');
@@ -221,6 +225,8 @@ function updateAll() {
         plan.addClass('d-none');
         actions.removeClass('d-none');
       }
+    }
+
     if (data.battery_timestamp) { batterySince = data.battery_timestamp; }
     if (data.solar_timestamp) { solarSince = data.solar_timestamp; }
     if (data.forecast_timestamp) { forecastSince = data.forecast_timestamp; }
