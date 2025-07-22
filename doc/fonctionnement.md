@@ -115,7 +115,7 @@ storage:
     	timeout: 300
         post:
 	    	methode: text
-	    	content: "<p>Le Nas est disponible, vous pouvez vous y connecter.</p>"	# Affiche ce texte dans l'iframe/a la place de l'Iframe
+	    	content: "<p>Le Nas est disponible, vous pouvez vous y connecter.</p>"	# Affiche la place de l'Iframe
 ```
 
 On va prendre ici quelques exemples : 

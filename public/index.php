@@ -188,8 +188,10 @@ var solarSince = 0;
 var forecastSince = 0;
 var storageSince = 0;
 var storagePostUp = <?php echo json_encode($cfg['storage']['up']['post'] ?? null); ?>;
+var storagePostDown = <?php echo json_encode($cfg['storage']['down']['post'] ?? null); ?>;
 var lastStorageStatus = null;
 var storagePostUpShown = false;
+var storagePostDownShown = false;
 
 function showPostUp() {
   if (!storagePostUp || storagePostUpShown) return;
@@ -208,6 +210,25 @@ function showPostUp() {
     cont.html(storagePostUp.content);
   }
   storagePostUpShown = true;
+}
+
+function showPostDown() {
+  if (!storagePostDown || storagePostDownShown) return;
+  if (storagePostDown.methode === 'redirect') {
+    window.location.href = storagePostDown.page;
+    storagePostDownShown = true;
+    return;
+  }
+  var cont = $('#storage-content');
+  cont.empty();
+  if (storagePostDown.methode === 'redirect-iframe' && storagePostDown.page) {
+    var ifr = $('<iframe>').attr('src', storagePostDown.page)
+      .addClass('w-100').css('height', '600px').attr('frameborder', '0');
+    cont.append(ifr);
+  } else if (storagePostDown.methode === 'text' && storagePostDown.content) {
+    cont.html(storagePostDown.content);
+  }
+  storagePostDownShown = true;
 }
 
 function notify(type, text, life) {
@@ -304,9 +325,14 @@ function updateAll() {
         if (data.storage.status !== lastStorageStatus) {
             if (data.storage.status === 'up') {
                 showPostUp();
+                storagePostDownShown = false;
+            } else if (data.storage.status === 'down') {
+                showPostDown();
+                storagePostUpShown = false;
             } else {
                 $('#storage-content').empty();
                 storagePostUpShown = false;
+                storagePostDownShown = false;
             }
             lastStorageStatus = data.storage.status;
         }
