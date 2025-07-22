@@ -6,7 +6,11 @@ use Symfony\Component\Yaml\Yaml;
 use WakeOnStorage\Auth;
 use WakeOnStorage\Logger;
 
-$global = Yaml::parseFile(__DIR__ . '/../config/global.yml');
+$global = Yaml::parseFile(__DIR__ . '/../config/global-default.yml');
+$override = __DIR__ . '/../config/global.yml';
+if (file_exists($override)) {
+    $global = array_replace_recursive($global, Yaml::parseFile($override));
+}
 $host = $_SERVER['HTTP_HOST'] ?? 'default';
 $host = preg_replace('/:\d+$/', '', $host);
 $configDir = __DIR__ . '/../' . ($global['interface_config_dir'] ?? 'config/interfaces');
@@ -174,6 +178,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
 <script>
 var refreshInterval = <?= $refresh ?> * 1000;
 var routerSince = 0;
+var batterySince = 0;
+var solarSince = 0;
+var forecastSince = 0;
 
 function notify(type, text, life) {
   var cls = type === 'warn' ? 'warning' : 'info';
@@ -191,7 +198,12 @@ if (typeof initialMessage !== 'undefined') {
 var routerNote = null;
 
 function updateAll() {
-  $.getJSON('api.php', { router_since: routerSince }, function(data) {
+  $.getJSON('api.php', {
+      router_since: routerSince,
+      battery_since: batterySince,
+      solar_since: solarSince,
+      forecast_since: forecastSince
+  }, function(data) {
     if (data.router_timestamp) {
       routerSince = data.router_timestamp;
     }
@@ -214,6 +226,13 @@ function updateAll() {
         actions.removeClass('d-none');
       }
     }
+    if (data.battery_timestamp) { batterySince = data.battery_timestamp; }
+    if (data.solar_timestamp) { solarSince = data.solar_timestamp; }
+    if (data.forecast_timestamp) { forecastSince = data.forecast_timestamp; }
+    if (data.batterie) console.log('batterie', data.batterie);
+    if (data.production_solaire) console.log('prod', data.production_solaire);
+    if (data.production_solaire_estimation) console.log('forecast', data.production_solaire_estimation);
+    if (data.debug) console.debug('api debug', data.debug);
   }).always(function() {
     setTimeout(updateAll, refreshInterval);
   });
