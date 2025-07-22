@@ -101,6 +101,7 @@ Available sources:
 
 Each entry defines the API URL, bearer token and cache lifetime (TTL). When the
 cache is older than the TTL the API is queried again; otherwise the stored value
+
 is returned. Invalid responses (for example when the API is unreachable) are not
 stored, so the next request will retry immediately until a valid value is
 obtained. A `debug` flag can be set in `global.yml` to attach verbose

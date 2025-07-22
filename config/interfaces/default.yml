@@ -1,0 +1,93 @@
+interface:
+  name: Wake On Storage - Default
+  logo: ./img/WakeOnStorage-FulltLogoBan.png
+  css:
+    - ./css/custom.css
+  js_include:
+    - ./js/custom.js
+auth:
+  method:
+    - uniq
+  uniq:
+    password_hash: "$2y$10$Pbuw5/s64M66RX.8bndBL.GF9solS6Yeu6lDiIwa28n4aqfb3PU0y"   # demo
+router:
+  router_check:
+    methode: ping
+    host: nas.retzo.net
+    count: 1
+    timeout: 1
+  router_up:
+    - "09:00"
+    - "12:00"
+energy: solar-stric
+ajax:
+  refresh: 10
+  router_refresh: 10
+#  file:
+#    path: /path/to/passwd.txt     # lines formatted "user:password"
+#  imap:
+#    server: imap.example.com
+#    port: 993
+#    secure: ssl
+storage:
+  conso: 5
+  wake_time:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+  check:
+    methode: api
+    param:
+      url: "http://wakeonstorage-local-test.retzo.net/api/nas/status"
+      auth: 
+        type: bearer
+        tocken: "mysecrettoken"
+      headers:
+        Content-Type: application/json
+      method: GET
+      expected_result:
+        status_code: 200
+  up:
+    methode: api
+    param:
+      url: "http://wakeonstorage-local-test.retzo.net/api/nas/up"	
+      auth: 
+        type: bearer
+        tocken: "mysecrettoken"
+      headers:
+        Content-Type: application/json
+        Content-Length: 0
+      method: POST
+      expected_result:
+         status_code: 200
+         json:
+           path: "$.success"
+           equals: "true"
+    time: 120 # Temps de démarrage attendu (après un up) en secondes
+    timeout: 300 # Temps après lequel on considère qu'il y a un problème
+    post_up:
+      methode: redirect-iframe
+      page: https://wakeonstorage-local-test.retzo.net
+  down:
+    methode: api
+    param:
+      url: "http://wakeonstorage-local-test.retzo.net/api/nas/down"
+      auth: 
+        type: bearer
+        tocken: "mysecrettoken"
+      headers:
+        Content-Type: application/json
+        Content-Length: 0
+      method: POST
+      expected_result:
+         status_code: 200
+         json:
+           path: "$.success"
+           equals: "true"
+    time: 60
+    timeout: 120
+    post:
+      methode: text
+      content: "<p>Stockage arrêté</p>"

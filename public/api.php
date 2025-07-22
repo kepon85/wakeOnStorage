@@ -70,14 +70,7 @@ $solarRefresh = (int)($global['ajax']['production_solaire_refresh'] ?? 600);
 $forecastSince = isset($_GET['forecast_since']) ? (int)$_GET['forecast_since'] : 0;
 $forecastRefresh = (int)($global['ajax']['production_solaire_estimation_refresh'] ?? 1800);
 
-$result = ['timestamp' => $now];
-
-if ($now - $routerSince >= $routerRefresh) {
-    $routerAvailable = true;
-    $nextRouter = null;
-    if (!empty($cfg['router']['router_check'])) {
-        $rc = $cfg['router']['router_check'];
-        if (($rc['methode'] ?? '') === 'ping') {
+@@ -76,101 +81,104 @@ if ($now - $routerSince >= $routerRefresh) {
             $hostCheck = $rc['host'] ?? 'localhost';
             $count = (int)($rc['count'] ?? 1);
             $timeout = (int)($rc['timeout'] ?? 1);
@@ -181,4 +174,3 @@ if ($debugEnabled) {
     $result['debug'] = $debugLog;
 }
 echo json_encode($result);
-
