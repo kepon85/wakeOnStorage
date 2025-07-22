@@ -5,6 +5,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use Symfony\Component\Yaml\Yaml;
 use WakeOnStorage\Router;
 use WakeOnStorage\Storage;
+use WakeOnStorage\Logger;
 
 function http_get_json(string $url, array $headers = [], int $timeout = 5): ?array {
     $opts = [
@@ -62,6 +63,7 @@ $pdo = new PDO('sqlite:' . $dbPath);
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->exec("CREATE TABLE IF NOT EXISTS data_cache (key TEXT PRIMARY KEY, value TEXT, updated_at INTEGER)");
 $pdo->exec("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT, action TEXT, user TEXT, ip TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS spool (id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT, action TEXT, run_at INTEGER, attempts INTEGER DEFAULT 0)");
 
 $action = $_POST['action'] ?? ($_GET['action'] ?? null);
 if (in_array($action, ['storage_up', 'storage_down'])) {
@@ -75,6 +77,25 @@ if (in_array($action, ['storage_up', 'storage_down'])) {
     }
     $stmt = $pdo->prepare("INSERT INTO events (host, action, user, ip) VALUES (?,?,?,?)");
     $stmt->execute([$host, $action, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '']);
+    if ($action === 'storage_up' && $ok) {
+        $dur = floatval($_POST['duration'] ?? ($_GET['duration'] ?? 0));
+        if ($dur > 0) {
+            $runAt = time() + (int)($dur * 3600);
+            $row = $pdo->prepare("SELECT id, run_at FROM spool WHERE host=? AND action='storage_down' ORDER BY run_at DESC LIMIT 1");
+            $row->execute([$host]);
+            $r = $row->fetch(PDO::FETCH_ASSOC);
+            if ($r && (int)$r['run_at'] > time()) {
+                if ($runAt > (int)$r['run_at']) {
+                    $upd = $pdo->prepare('UPDATE spool SET run_at=? WHERE id=?');
+                    $upd->execute([$runAt, $r['id']]);
+                }
+            } else {
+                $ins = $pdo->prepare('INSERT INTO spool (host, action, run_at) VALUES (?,?,?)');
+                $ins->execute([$host, 'storage_down', $runAt]);
+            }
+            Logger::logEvent($pdo, $host, 'schedule_down', is_string($user) ? $user : '');
+        }
+    }
     header('Content-Type: application/json');
     $resp = ['success' => $ok];
     if ($debugEnabled) {

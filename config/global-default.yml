@@ -34,3 +34,11 @@ ajax:
   production_solaire_refresh: 60
   production_solaire_estimation_refresh: 60
   storage_refresh: 10
+
+# Spooler configuration
+spooler:
+  max_attempts: 3       # retry attempts for failed actions
+
+# Maximum number of rows kept in events table
+events:
+  max_rows: 1000

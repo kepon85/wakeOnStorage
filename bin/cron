@@ -1,0 +1,91 @@
+#!/usr/bin/env php
+<?php
+require __DIR__ . '/../vendor/autoload.php';
+
+use Symfony\Component\Yaml\Yaml;
+use WakeOnStorage\Storage;
+use WakeOnStorage\Logger;
+
+$opts = getopt('v', ['verbose', 'debug']);
+$verbose = isset($opts['v']) || isset($opts['verbose']);
+$debug = $verbose || isset($opts['debug']);
+
+$global = Yaml::parseFile(__DIR__ . '/../config/global-default.yml');
+$override = __DIR__ . '/../config/global.yml';
+if (file_exists($override)) {
+    $global = array_replace_recursive($global, Yaml::parseFile($override));
+}
+
+$dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
+$dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
+$pdo = new PDO('sqlite:' . $dbPath);
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$pdo->exec("CREATE TABLE IF NOT EXISTS spool (id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT, action TEXT, run_at INTEGER, attempts INTEGER DEFAULT 0)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT, action TEXT, user TEXT, ip TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+
+// Purge old events if over limit
+$maxRows = (int)($global['events']['max_rows'] ?? 0);
+if ($maxRows > 0) {
+    $cnt = (int)$pdo->query('SELECT COUNT(*) FROM events')->fetchColumn();
+    if ($cnt > $maxRows) {
+        $del = $cnt - $maxRows;
+        $pdo->exec("DELETE FROM events WHERE id IN (SELECT id FROM events ORDER BY id ASC LIMIT $del)");
+    }
+}
+
+$retryMax = (int)($global['spooler']['max_attempts'] ?? 3);
+$now = time();
+$stmt = $pdo->prepare('SELECT * FROM spool WHERE run_at <= ? ORDER BY run_at ASC');
+$stmt->execute([$now]);
+$tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($tasks as $t) {
+    $host = $t['host'];
+    $action = $t['action'];
+    if ($verbose) echo date('c') . " Processing $host $action\n";
+
+    $configDir = __DIR__ . '/../' . ($global['interface_config_dir'] ?? 'config/interfaces');
+    $file = "$configDir/{$host}.yml";
+    if (!file_exists($file)) {
+        $file = "$configDir/default.yml";
+    }
+    if (!file_exists($file)) {
+        if ($verbose) echo "Config for $host not found\n";
+        $pdo->prepare('DELETE FROM spool WHERE id=?')->execute([$t['id']]);
+        continue;
+    }
+    $cfg = Yaml::parseFile($file);
+    $desired = $action === 'storage_up' ? 'up' : 'down';
+    $status = null;
+    if (!empty($cfg['storage']['check'])) {
+        $status = Storage::checkStatus($cfg['storage']['check'], $debug, $log);
+    }
+    if ($status === $desired) {
+        Logger::logEvent($pdo, $host, $action . '_skip', 'cron');
+        $pdo->prepare('DELETE FROM spool WHERE id=?')->execute([$t['id']]);
+        if ($verbose) echo "Already $desired\n";
+        continue;
+    }
+    $cfgAct = $cfg['storage'][$action === 'storage_up' ? 'up' : 'down'] ?? null;
+    $ok = false;
+    $log = [];
+    if ($cfgAct) {
+        $ok = Storage::trigger($cfgAct, $debug, $log);
+    }
+    if ($ok) {
+        Logger::logEvent($pdo, $host, $action, 'cron');
+        $pdo->prepare('DELETE FROM spool WHERE id=?')->execute([$t['id']]);
+        if ($verbose) echo "Success\n";
+    } else {
+        $attempts = (int)$t['attempts'] + 1;
+        if ($attempts >= $retryMax) {
+            Logger::logEvent($pdo, $host, $action . '_fail', 'cron');
+            $pdo->prepare('DELETE FROM spool WHERE id=?')->execute([$t['id']]);
+            if ($verbose) echo "Failed\n";
+        } else {
+            $pdo->prepare('UPDATE spool SET attempts=? WHERE id=?')->execute([$attempts, $t['id']]);
+            if ($verbose) echo "Retry $attempts\n";
+        }
+    }
+}
+?>

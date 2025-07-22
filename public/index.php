@@ -48,6 +48,7 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS events (
     ip TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 )");
+$pdo->exec("CREATE TABLE IF NOT EXISTS spool (id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT, action TEXT, run_at INTEGER, attempts INTEGER DEFAULT 0)");
 $authMethods = $cfg['auth']['method'] ?? ['none'];
 $authKey = 'wos_auth_' . $host;
 $authenticatedUser = $_SESSION[$authKey] ?? null;

@@ -132,6 +132,9 @@ Utility scripts are provided in `bin/`:
   add under `auth.uniq.password_hash`.
 - `bin/add-user <file> <username> [password]` hashes the password and appends it
   to the specified credentials file.
+- `bin/cron` processes scheduled actions. Run it periodically (e.g. via cron)
+  to execute pending `storage_up`/`storage_down` tasks and purge old events. Use
+  `-v` for verbose output.
 
 ## Post-up redirection override
 
