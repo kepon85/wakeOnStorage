@@ -30,6 +30,6 @@ debug: false
 ajax:
   refresh: 10          # general polling interval
   router_refresh: 10   # router status refresh interval
-  batterie_refresh: 600
-  production_solaire_refresh: 600
-  production_solaire_estimation_refresh: 1800
+  batterie_refresh: 60
+  production_solaire_refresh: 60
+  production_solaire_estimation_refresh: 60

@@ -8,3 +8,4 @@ stats/
 vendor/
 composer.lock
 var/
+*patch
