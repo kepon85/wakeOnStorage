@@ -301,10 +301,10 @@ if ($now - $storageSince >= $storageRefresh && !empty($cfg['storage']['check']))
     $result['storage_timestamp'] = $now;
 }
 
-$stmt = $pdo->prepare("SELECT run_at, user, ip FROM spool WHERE host=? AND action='storage_down' ORDER BY run_at DESC LIMIT 1");
-$stmt->execute([$host]);
+$stmt = $pdo->prepare("SELECT run_at, user, ip FROM spool WHERE host=? AND action='storage_down' AND run_at=(SELECT MAX(run_at) FROM spool WHERE host=? AND action='storage_down') LIMIT 1");
+$stmt->execute([$host, $host]);
 $row = $stmt->fetch(PDO::FETCH_ASSOC);
-if ($row && (int)$row['run_at'] > $now) {
+if ($row) {
     if (!isset($result['storage'])) $result['storage'] = [];
     $result['storage']['scheduled_down'] = (int)$row['run_at'];
     $result['storage']['scheduled_down_user'] = (string)$row['user'];

@@ -308,11 +308,7 @@ function updateDownCountdown() {
   if (!scheduledDownDate) return;
   var now = new Date();
   var diff = scheduledDownDate - now;
-  if (diff <= 0) {
-    $('#down-info').addClass('d-none');
-    scheduledDownDate = null;
-    return;
-  }
+  if (diff < 0) diff = 0;
   var minutes = Math.floor(diff / 60000);
   var hours = Math.floor(minutes / 60);
   minutes = minutes % 60;
@@ -457,7 +453,14 @@ $('#btn-on').on('click', function(e){
   var dur = $('#on-duration').val();
   doStorageAction('storage_up', {duration: dur});
 });
-$('#btn-off').on('click', function(e){ e.preventDefault(); doStorageAction('storage_down'); });
+$('#btn-off').on('click', function(e){
+  e.preventDefault();
+  if (scheduledDownUser && ((scheduledDownUser && scheduledDownUser !== currentUser) || (scheduledDownIp && scheduledDownIp !== currentIp))) {
+    notify('warn', "Impossible d'éteindre : arrêt déjà programmé par un autre utilisateur.", 5000);
+    return;
+  }
+  doStorageAction('storage_down');
+});
 $('#btn-extend').on('click', function(e){
   e.preventDefault();
   var dur = $('#on-duration').val();
