@@ -92,7 +92,7 @@ storage:
 #			targetHost: "mon.domaine.fr"         // mon IP publique ou DNS
     	time: 120 # Temps de démarrage attendu (après un up) en secondes
     	timeout: 300 # Temps après lequel on considère qu'il y a un problème
-    	post_up:
+    	post:
     		methode: redirect-iframe|redirect	# Redirection dans l'Iframe ou redirection de toute la page 
     		page: https://nas.retzo.net
     down: 

@@ -170,6 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
     <button id="btn-on" class="btn btn-success me-2">Allumer</button>
     <button id="btn-off" class="btn btn-danger">Eteindre</button>
   </div>
+  <div id="storage-content" class="mb-3"></div>
   <div id="loading" class="position-fixed top-0 bottom-0 start-0 end-0 bg-light bg-opacity-75 d-none justify-content-center align-items-center" style="z-index:1060;">
     <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
   </div>
@@ -186,6 +187,28 @@ var batterySince = 0;
 var solarSince = 0;
 var forecastSince = 0;
 var storageSince = 0;
+var storagePostUp = <?php echo json_encode($cfg['storage']['up']['post'] ?? null); ?>;
+var lastStorageStatus = null;
+var storagePostUpShown = false;
+
+function showPostUp() {
+  if (!storagePostUp || storagePostUpShown) return;
+  if (storagePostUp.methode === 'redirect') {
+    window.location.href = storagePostUp.page;
+    storagePostUpShown = true;
+    return;
+  }
+  var cont = $('#storage-content');
+  cont.empty();
+  if (storagePostUp.methode === 'redirect-iframe' && storagePostUp.page) {
+    var ifr = $('<iframe>').attr('src', storagePostUp.page)
+      .addClass('w-100').css('height', '600px').attr('frameborder', '0');
+    cont.append(ifr);
+  } else if (storagePostUp.methode === 'text' && storagePostUp.content) {
+    cont.html(storagePostUp.content);
+  }
+  storagePostUpShown = true;
+}
 
 function notify(type, text, life) {
   var cls = type === 'warn' ? 'warning' : 'info';
@@ -277,6 +300,15 @@ function updateAll() {
         } else if (data.storage.status === 'down') {
             $('#btn-on').prop('disabled', false);
             $('#btn-off').prop('disabled', true);
+        }
+        if (data.storage.status !== lastStorageStatus) {
+            if (data.storage.status === 'up') {
+                showPostUp();
+            } else {
+                $('#storage-content').empty();
+                storagePostUpShown = false;
+            }
+            lastStorageStatus = data.storage.status;
         }
     }
     if (data.batterie) console.log('batterie', data.batterie);
