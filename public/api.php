@@ -63,41 +63,108 @@ $pdo = new PDO('sqlite:' . $dbPath);
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->exec("CREATE TABLE IF NOT EXISTS data_cache (key TEXT PRIMARY KEY, value TEXT, updated_at INTEGER)");
 $pdo->exec("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT, action TEXT, user TEXT, ip TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
-$pdo->exec("CREATE TABLE IF NOT EXISTS spool (id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT, action TEXT, run_at INTEGER, attempts INTEGER DEFAULT 0)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS spool (".
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,".
+    " host TEXT, action TEXT, run_at INTEGER,".
+    " user TEXT, ip TEXT, attempts INTEGER DEFAULT 0)");
 
 $action = $_POST['action'] ?? ($_GET['action'] ?? null);
-if (in_array($action, ['storage_up', 'storage_down'])) {
+if (in_array($action, ['storage_up', 'storage_down', 'extend_up'])) {
     $userKey = 'wos_auth_' . $host;
     $user = $_SESSION[$userKey] ?? '';
-    $cfgAct = $cfg['storage'][$action === 'storage_up' ? 'up' : 'down'] ?? null;
     $ok = false;
     $logAct = [];
-    if ($cfgAct) {
-        $ok = Storage::trigger($cfgAct, $debugEnabled, $logAct);
-    }
-    $stmt = $pdo->prepare("INSERT INTO events (host, action, user, ip) VALUES (?,?,?,?)");
-    $stmt->execute([$host, $action, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '']);
-    if ($action === 'storage_up' && $ok) {
+    if ($action === 'storage_up') {
+        $cfgAct = $cfg['storage']['up'] ?? null;
+        if ($cfgAct) {
+            $ok = Storage::trigger($cfgAct, $debugEnabled, $logAct);
+        }
+        $stmt = $pdo->prepare("INSERT INTO events (host, action, user, ip) VALUES (?,?,?,?)");
+        $stmt->execute([$host, $action, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '']);
+        if ($ok) {
+            $dur = floatval($_POST['duration'] ?? ($_GET['duration'] ?? 0));
+            if ($dur > 0) {
+                $runAt = time() + (int)($dur * 3600);
+                $row = $pdo->prepare("SELECT id, run_at FROM spool WHERE host=? AND action='storage_down' ORDER BY run_at DESC LIMIT 1");
+                $row->execute([$host]);
+                $r = $row->fetch(PDO::FETCH_ASSOC);
+                if ($r && (int)$r['run_at'] > time()) {
+                    if ($runAt > (int)$r['run_at']) {
+                        $upd = $pdo->prepare('UPDATE spool SET run_at=?, user=?, ip=? WHERE id=?');
+                        $upd->execute([$runAt, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '', $r['id']]);
+                    }
+                } else {
+                    $ins = $pdo->prepare('INSERT INTO spool (host, action, run_at, user, ip) VALUES (?,?,?,?,?)');
+                    $ins->execute([$host, 'storage_down', $runAt, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '']);
+                }
+                Logger::logEvent($pdo, $host, 'schedule_down', is_string($user) ? $user : '');
+            }
+        }
+    } elseif ($action === 'storage_down') {
+        $reason = null;
+        $stmt = $pdo->prepare("SELECT id, run_at, user, ip FROM spool WHERE host=? AND action='storage_down' ORDER BY run_at DESC LIMIT 1");
+        $stmt->execute([$host]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $allow = true;
+        if ($row && (int)$row['run_at'] > time()) {
+            $scheduledRun = (int)$row['run_at'];
+            $scheduledUser = $row['user'];
+            $scheduledIp = $row['ip'] ?? '';
+            if ((string)$row['user'] !== (string)$user || ($row['ip'] ?? '') !== ($_SERVER['REMOTE_ADDR'] ?? '')) {
+                $allow = false;
+                $reason = 'not_owner';
+            } else {
+                $pdo->prepare('DELETE FROM spool WHERE id=?')->execute([$row['id']]);
+            }
+        }
+        if ($allow) {
+            $cfgAct = $cfg['storage']['down'] ?? null;
+            if ($cfgAct) {
+                $ok = Storage::trigger($cfgAct, $debugEnabled, $logAct);
+            }
+            $stmt = $pdo->prepare("INSERT INTO events (host, action, user, ip) VALUES (?,?,?,?)");
+            $stmt->execute([$host, $action, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '']);
+            if ($ok) {
+                $pdo->prepare("DELETE FROM spool WHERE host=? AND action='storage_down'")->execute([$host]);
+                Logger::logEvent($pdo, $host, 'storage_down', is_string($user) ? $user : '');
+            }
+        } else {
+            $ok = false;
+        }
+    } elseif ($action === 'extend_up') {
         $dur = floatval($_POST['duration'] ?? ($_GET['duration'] ?? 0));
         if ($dur > 0) {
-            $runAt = time() + (int)($dur * 3600);
-            $row = $pdo->prepare("SELECT id, run_at FROM spool WHERE host=? AND action='storage_down' ORDER BY run_at DESC LIMIT 1");
+            $row = $pdo->prepare("SELECT id, run_at, user FROM spool WHERE host=? AND action='storage_down' ORDER BY run_at DESC LIMIT 1");
             $row->execute([$host]);
             $r = $row->fetch(PDO::FETCH_ASSOC);
+            $add = (int)($dur * 3600);
             if ($r && (int)$r['run_at'] > time()) {
-                if ($runAt > (int)$r['run_at']) {
-                    $upd = $pdo->prepare('UPDATE spool SET run_at=? WHERE id=?');
-                    $upd->execute([$runAt, $r['id']]);
-                }
+                $newRun = (int)$r['run_at'] + $add;
+                $pdo->prepare('UPDATE spool SET run_at=?, user=?, ip=? WHERE id=?')->execute([
+                    $newRun,
+                    is_string($user) ? $user : '',
+                    $_SERVER['REMOTE_ADDR'] ?? '',
+                    $r['id']
+                ]);
             } else {
-                $ins = $pdo->prepare('INSERT INTO spool (host, action, run_at) VALUES (?,?,?)');
-                $ins->execute([$host, 'storage_down', $runAt]);
+                $newRun = time() + $add;
+                $pdo->prepare('INSERT INTO spool (host, action, run_at, user, ip) VALUES (?,?,?,?,?)')
+                    ->execute([$host, 'storage_down', $newRun, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '']);
             }
-            Logger::logEvent($pdo, $host, 'schedule_down', is_string($user) ? $user : '');
+            Logger::logEvent($pdo, $host, 'extend_up', is_string($user) ? $user : '');
+            $ok = true;
         }
     }
     header('Content-Type: application/json');
     $resp = ['success' => $ok];
+    if (isset($reason)) {
+        $resp['reason'] = $reason;
+        if (isset($scheduledRun)) {
+            $resp['scheduled_down'] = $scheduledRun;
+            $resp['scheduled_down_user'] = $scheduledUser ?? '';
+            $resp['scheduled_down_ip'] = $scheduledIp ?? '';
+        }
+    }
     if ($debugEnabled) {
         $resp['debug'] = $logAct;
         $debugLog = array_merge($debugLog, $logAct);
@@ -228,8 +295,20 @@ if ($now - $storageSince >= $storageRefresh && !empty($cfg['storage']['check']))
     $status = Storage::checkStatus($cfg['storage']['check'], $debugEnabled, $debugLog);
     if ($status !== null) {
         $result['storage'] = ['status' => $status];
+    } else {
+        $result['storage'] = [];
     }
     $result['storage_timestamp'] = $now;
+}
+
+$stmt = $pdo->prepare("SELECT run_at, user, ip FROM spool WHERE host=? AND action='storage_down' ORDER BY run_at DESC LIMIT 1");
+$stmt->execute([$host]);
+$row = $stmt->fetch(PDO::FETCH_ASSOC);
+if ($row && (int)$row['run_at'] > $now) {
+    if (!isset($result['storage'])) $result['storage'] = [];
+    $result['storage']['scheduled_down'] = (int)$row['run_at'];
+    $result['storage']['scheduled_down_user'] = (string)$row['user'];
+    $result['storage']['scheduled_down_ip'] = (string)($row['ip'] ?? '');
 }
 
 header('Content-Type: application/json');

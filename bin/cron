@@ -20,7 +20,10 @@ $dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
 $dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
 $pdo = new PDO('sqlite:' . $dbPath);
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$pdo->exec("CREATE TABLE IF NOT EXISTS spool (id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT, action TEXT, run_at INTEGER, attempts INTEGER DEFAULT 0)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS spool (".
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,".
+    " host TEXT, action TEXT, run_at INTEGER,".
+    " user TEXT, ip TEXT, attempts INTEGER DEFAULT 0)");
 $pdo->exec("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT, action TEXT, user TEXT, ip TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
 
 // Purge old events if over limit

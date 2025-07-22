@@ -48,7 +48,10 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS events (
     ip TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 )");
-$pdo->exec("CREATE TABLE IF NOT EXISTS spool (id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT, action TEXT, run_at INTEGER, attempts INTEGER DEFAULT 0)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS spool (".
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,".
+    " host TEXT, action TEXT, run_at INTEGER,".
+    " user TEXT, ip TEXT, attempts INTEGER DEFAULT 0)");
 $authMethods = $cfg['auth']['method'] ?? ['none'];
 $authKey = 'wos_auth_' . $host;
 $authenticatedUser = $_SESSION[$authKey] ?? null;
@@ -187,7 +190,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
       <?php endforeach; ?>
     </select>
     <button id="btn-on" class="btn btn-success me-2">Allumer</button>
+    <button id="btn-extend" class="btn btn-primary me-2 d-none">Prolonger</button>
     <button id="btn-off" class="btn btn-danger">Eteindre</button>
+  </div>
+  <div id="down-info" class="alert alert-warning d-none mb-3">
+    Le storage va s'arrêter dans <span id="down-time">--</span>.
   </div>
   <div id="storage-content" class="mb-3"></div>
   <div id="loading" class="position-fixed top-0 bottom-0 start-0 end-0 bg-light bg-opacity-75 d-none justify-content-center align-items-center" style="z-index:1060;">
@@ -200,6 +207,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
 <?php $refresh = (int)($global['ajax']['refresh'] ?? 10); ?>
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script>
+var currentUser = <?= json_encode($authenticatedUser) ?>;
+var currentIp = <?= json_encode($_SERVER['REMOTE_ADDR'] ?? '') ?>;
 var refreshInterval = <?= $refresh ?> * 1000;
 var routerSince = 0;
 var batterySince = 0;
@@ -265,6 +274,9 @@ if (typeof initialMessage !== 'undefined') {
 }
 var routerNote = null;
 var nextRouterDate = null;
+var scheduledDownDate = null;
+var scheduledDownUser = null;
+var scheduledDownIp = null;
 
 function parseNextTime(str) {
   if (!str) return null;
@@ -292,7 +304,24 @@ function updateCountdown() {
   );
 }
 
+function updateDownCountdown() {
+  if (!scheduledDownDate) return;
+  var now = new Date();
+  var diff = scheduledDownDate - now;
+  if (diff <= 0) {
+    $('#down-info').addClass('d-none');
+    scheduledDownDate = null;
+    return;
+  }
+  var minutes = Math.floor(diff / 60000);
+  var hours = Math.floor(minutes / 60);
+  minutes = minutes % 60;
+  $('#down-time').text(hours + ' heure(s) et ' + minutes + ' minute(s)');
+  $('#down-info').removeClass('d-none');
+}
+
 setInterval(updateCountdown, 60000);
+setInterval(updateDownCountdown, 60000);
 
 function updateAll() {
   $.getJSON('api.php', {
@@ -334,11 +363,35 @@ function updateAll() {
     if (data.forecast_timestamp) { forecastSince = data.forecast_timestamp; }
     if (data.storage_timestamp) { storageSince = data.storage_timestamp; }
     if (data.storage) {
+        if (data.storage.scheduled_down) {
+            scheduledDownDate = new Date(data.storage.scheduled_down * 1000);
+            scheduledDownUser = data.storage.scheduled_down_user || null;
+            scheduledDownIp = data.storage.scheduled_down_ip || null;
+            updateDownCountdown();
+        } else {
+            scheduledDownDate = null;
+            scheduledDownUser = null;
+            scheduledDownIp = null;
+            $('#down-info').addClass('d-none');
+        }
+        var otherOwner = false;
+        if (scheduledDownDate && scheduledDownUser !== null) {
+            if ((scheduledDownUser && scheduledDownUser !== currentUser) ||
+                (scheduledDownIp && scheduledDownIp !== currentIp)) {
+                otherOwner = true;
+            }
+        }
         if (data.storage.status === 'up') {
-            $('#btn-on').prop('disabled', true);
-            $('#btn-off').prop('disabled', false);
+            $('#btn-on').addClass('d-none');
+            $('#btn-extend').removeClass('d-none');
+            $('#btn-off').prop('disabled', otherOwner);
         } else if (data.storage.status === 'down') {
-            $('#btn-on').prop('disabled', false);
+            $('#btn-on').removeClass('d-none').prop('disabled', false);
+            $('#btn-extend').addClass('d-none');
+            $('#btn-off').prop('disabled', true);
+        } else {
+            $('#btn-on').removeClass('d-none').prop('disabled', true);
+            $('#btn-extend').addClass('d-none');
             $('#btn-off').prop('disabled', true);
         }
         if (data.storage.status !== lastStorageStatus) {
@@ -374,10 +427,25 @@ function doStorageAction(act, extra) {
   }
   $.post('api.php', data, function(res) {
     if (res && res.success) {
-      notify('info', act === 'storage_up' ? 'Allumage demand\xE9' : 'Extinction demand\xE9e');
+      var msg = 'Action effectu\xE9e';
+      if (act === 'storage_up') msg = 'Allumage demand\xE9';
+      else if (act === 'storage_down') msg = 'Extinction demand\xE9e';
+      else if (act === 'extend_up') msg = 'Prolongation demand\xE9e';
+      notify('info', msg);
       storageSince = 0; // force refresh
     } else {
-      notify('warn', 'Erreur lors de l\'action');
+      if (act === 'storage_down' && res.reason === 'not_owner') {
+        var when = res.scheduled_down ? new Date(res.scheduled_down * 1000) : null;
+        var txt = "Impossible d'\xE9teindre : arrêt programm\xE9 pour ";
+        if (when) {
+          txt += when.toLocaleString();
+        } else {
+          txt += 'une date inconnue';
+        }
+        notify('warn', txt, 5000);
+      } else {
+        notify('warn', 'Erreur lors de l\'action');
+      }
     }
   }, 'json').always(function(){
     $('#loading').addClass('d-none');
@@ -390,6 +458,11 @@ $('#btn-on').on('click', function(e){
   doStorageAction('storage_up', {duration: dur});
 });
 $('#btn-off').on('click', function(e){ e.preventDefault(); doStorageAction('storage_down'); });
+$('#btn-extend').on('click', function(e){
+  e.preventDefault();
+  var dur = $('#on-duration').val();
+  doStorageAction('extend_up', {duration: dur});
+});
 </script>
 </body>
 </html>
