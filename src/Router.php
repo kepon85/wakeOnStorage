@@ -19,25 +19,35 @@ class Router
         if (!$times) {
             return null;
         }
-        $now = time();
-        $today = date('Y-m-d ');
-        $next = null;
+
+        $now = new \DateTimeImmutable('now');
+        $future = [];
+
         foreach ($times as $t) {
-            $ts = strtotime($today . $t);
-            if ($ts === false) {
+            // Build a date for today with the provided time
+            $dt = \DateTimeImmutable::createFromFormat('H:i', trim($t));
+            if (!$dt) {
                 continue;
             }
-            if ($ts > $now) {
-                $next = $ts;
-                break;
+            $candidate = $dt->setDate(
+                (int)$now->format('Y'),
+                (int)$now->format('m'),
+                (int)$now->format('d')
+            );
+            if ($candidate <= $now) {
+                $candidate = $candidate->modify('+1 day');
             }
+            $future[] = $candidate;
         }
-        if ($next === null) {
-            $ts = strtotime('+1 day ' . $times[0]);
-            if ($ts !== false) {
-                $next = $ts;
-            }
+
+        if (!$future) {
+            return null;
         }
-        return $next ? date('H:i', $next) : null;
+
+        usort($future, function ($a, $b) {
+            return $a <=> $b;
+        });
+
+        return $future[0]->format('H:i');
     }
 }

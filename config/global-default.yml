@@ -24,7 +24,7 @@ interface_config_dir: config/interfaces
 db_path: data/wakeonstorage.sqlite
 
 # Enable verbose API logging in responses
-debug: false
+debug: true
 
 # Refresh interval (seconds) for AJAX calls (seconds)
 ajax:
@@ -33,3 +33,4 @@ ajax:
   batterie_refresh: 60
   production_solaire_refresh: 60
   production_solaire_estimation_refresh: 60
+  storage_refresh: 10

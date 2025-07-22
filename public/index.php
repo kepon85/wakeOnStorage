@@ -156,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
 
   <form id="router-plan" method="post" class="mb-3 d-none">
     <div class="mb-3">
-      <p>Le storage ne peut être allumé pour le moment, il le sera d'ici XXheures XXminutes, vous pouvez planifier un allumage : </p>
+      <p id="router-msg">Le storage ne peut être allumé pour le moment.</p>
       <label class="form-label">Durée d'allumage</label>
       <select name="router_end" class="form-select">
         <?php foreach ($wakeTimes as $t): ?>
@@ -167,8 +167,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
     <button type="submit" name="schedule_router" class="btn btn-primary">Planifier l'allumage</button>
   </form>
   <div id="router-actions" class="mb-3 d-none">
-    <a class="btn btn-success" href="?action=up">Allumer</a>
-    <a class="btn btn-danger" href="?action=down">Eteindre</a>
+    <button id="btn-on" class="btn btn-success me-2">Allumer</button>
+    <button id="btn-off" class="btn btn-danger">Eteindre</button>
+  </div>
+  <div id="loading" class="position-fixed top-0 bottom-0 start-0 end-0 bg-light bg-opacity-75 d-none justify-content-center align-items-center" style="z-index:1060;">
+    <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
   </div>
 </div>
 <?php if (!empty($cfg['interface']['js_include'])): foreach ($cfg['interface']['js_include'] as $js): ?>
@@ -182,6 +185,7 @@ var routerSince = 0;
 var batterySince = 0;
 var solarSince = 0;
 var forecastSince = 0;
+var storageSince = 0;
 
 function notify(type, text, life) {
   var cls = type === 'warn' ? 'warning' : 'info';
@@ -197,13 +201,43 @@ if (typeof initialMessage !== 'undefined') {
   notify('info', initialMessage);
 }
 var routerNote = null;
+var nextRouterDate = null;
+
+function parseNextTime(str) {
+  if (!str) return null;
+  var parts = str.split(':');
+  if (parts.length < 2) return null;
+  var now = new Date();
+  var target = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
+    parseInt(parts[0], 10), parseInt(parts[1], 10), 0);
+  if (target <= now) target.setDate(target.getDate() + 1);
+  return target;
+}
+
+function updateCountdown() {
+  if (!nextRouterDate) return;
+  var now = new Date();
+  var diff = nextRouterDate - now;
+  if (diff < 0) diff = 0;
+  var minutes = Math.floor(diff / 60000);
+  var hours = Math.floor(minutes / 60);
+  minutes = minutes % 60;
+  $('#router-msg').text(
+    'Le storage ne peut être allumé pour le moment, il le sera d\'ici ' +
+    hours + ' heure(s) et ' + minutes +
+    ' minute(s), vous pouvez planifier un allumage : '
+  );
+}
+
+setInterval(updateCountdown, 60000);
 
 function updateAll() {
   $.getJSON('api.php', {
       router_since: routerSince,
       battery_since: batterySince,
       solar_since: solarSince,
-      forecast_since: forecastSince
+      forecast_since: forecastSince,
+      storage_since: storageSince
   }, function(data) {
     if (data.router_timestamp) {
       routerSince = data.router_timestamp;
@@ -216,13 +250,18 @@ function updateAll() {
         var msg = 'Routeur injoignable';
         if (data.router.next) {
           msg += ' - prochain allumage ' + data.router.next;
+          nextRouterDate = parseNextTime(data.router.next);
+          updateCountdown();
+        } else {
+          nextRouterDate = null;
+          $('#router-msg').text('Le storage ne peut être allumé pour le moment.');
         }
         if (!routerNote) routerNote = notify('warn', msg, 0); else routerNote.text(msg);
         plan.removeClass('d-none');
         actions.addClass('d-none');
       } else {
         if (routerNote) { routerNote.remove(); routerNote = null; }
-
+        nextRouterDate = null;
         plan.addClass('d-none');
         actions.removeClass('d-none');
       }
@@ -230,6 +269,16 @@ function updateAll() {
     if (data.battery_timestamp) { batterySince = data.battery_timestamp; }
     if (data.solar_timestamp) { solarSince = data.solar_timestamp; }
     if (data.forecast_timestamp) { forecastSince = data.forecast_timestamp; }
+    if (data.storage_timestamp) { storageSince = data.storage_timestamp; }
+    if (data.storage) {
+        if (data.storage.status === 'up') {
+            $('#btn-on').prop('disabled', true);
+            $('#btn-off').prop('disabled', false);
+        } else if (data.storage.status === 'down') {
+            $('#btn-on').prop('disabled', false);
+            $('#btn-off').prop('disabled', true);
+        }
+    }
     if (data.batterie) console.log('batterie', data.batterie);
     if (data.production_solaire) console.log('prod', data.production_solaire);
     if (data.production_solaire_estimation) console.log('forecast', data.production_solaire_estimation);
@@ -239,6 +288,23 @@ function updateAll() {
   });
 }
 $(updateAll);
+
+function doStorageAction(act) {
+  $('#loading').removeClass('d-none');
+  $.post('api.php', {action: act}, function(res) {
+    if (res && res.success) {
+      notify('info', act === 'storage_up' ? 'Allumage demand\xE9' : 'Extinction demand\xE9e');
+      storageSince = 0; // force refresh
+    } else {
+      notify('warn', 'Erreur lors de l\'action');
+    }
+  }, 'json').always(function(){
+    $('#loading').addClass('d-none');
+  });
+}
+
+$('#btn-on').on('click', function(e){ e.preventDefault(); doStorageAction('storage_up'); });
+$('#btn-off').on('click', function(e){ e.preventDefault(); doStorageAction('storage_down'); });
 </script>
 </body>
 </html>

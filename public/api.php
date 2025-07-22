@@ -1,8 +1,10 @@
 <?php
+session_start();
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Symfony\Component\Yaml\Yaml;
 use WakeOnStorage\Router;
+use WakeOnStorage\Storage;
 
 function http_get_json(string $url, array $headers = [], int $timeout = 5): ?array {
     $opts = [
@@ -59,6 +61,23 @@ $dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
 $pdo = new PDO('sqlite:' . $dbPath);
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->exec("CREATE TABLE IF NOT EXISTS data_cache (key TEXT PRIMARY KEY, value TEXT, updated_at INTEGER)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT, action TEXT, user TEXT, ip TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+
+$action = $_POST['action'] ?? ($_GET['action'] ?? null);
+if (in_array($action, ['storage_up', 'storage_down'])) {
+    $userKey = 'wos_auth_' . $host;
+    $user = $_SESSION[$userKey] ?? '';
+    $cfgAct = $cfg['storage'][$action === 'storage_up' ? 'up' : 'down'] ?? null;
+    $ok = false;
+    if ($cfgAct) {
+        $ok = Storage::trigger($cfgAct);
+    }
+    $stmt = $pdo->prepare("INSERT INTO events (host, action, user, ip) VALUES (?,?,?,?)");
+    $stmt->execute([$host, $action, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '']);
+    header('Content-Type: application/json');
+    echo json_encode(['success' => $ok]);
+    exit;
+}
 
 $now = time();
 $routerSince = isset($_GET['router_since']) ? (int)$_GET['router_since'] : 0;
@@ -69,6 +88,8 @@ $solarSince = isset($_GET['solar_since']) ? (int)$_GET['solar_since'] : 0;
 $solarRefresh = (int)($global['ajax']['production_solaire_refresh'] ?? 600);
 $forecastSince = isset($_GET['forecast_since']) ? (int)$_GET['forecast_since'] : 0;
 $forecastRefresh = (int)($global['ajax']['production_solaire_estimation_refresh'] ?? 1800);
+$storageSince = isset($_GET['storage_since']) ? (int)$_GET['storage_since'] : 0;
+$storageRefresh = (int)($global['ajax']['storage_refresh'] ?? 10);
 
 $result = ['timestamp' => $now];
 
@@ -174,6 +195,14 @@ if ($now - $forecastSince >= $forecastRefresh && !empty($global['data']['product
     }
     $result['production_solaire_estimation'] = ['values' => ($forecast ?: 'NA')];
     $result['forecast_timestamp'] = $now;
+}
+
+if ($now - $storageSince >= $storageRefresh && !empty($cfg['storage']['check'])) {
+    $status = Storage::checkStatus($cfg['storage']['check']);
+    if ($status !== null) {
+        $result['storage'] = ['status' => $status];
+    }
+    $result['storage_timestamp'] = $now;
 }
 
 header('Content-Type: application/json');
