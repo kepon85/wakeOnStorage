@@ -156,6 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
 
   <form id="router-plan" method="post" class="mb-3 d-none">
     <div class="mb-3">
+      <p>Le storage ne peut être allumé pour le moment, il le sera d'ici XXheures XXminutes, vous pouvez planifier un allumage : </p>
       <label class="form-label">Durée d'allumage</label>
       <select name="router_end" class="form-select">
         <?php foreach ($wakeTimes as $t): ?>

@@ -50,7 +50,7 @@ $host = preg_replace('/:\d+$/', '', $host);
 $configDir = __DIR__ . '/../' . ($global['interface_config_dir'] ?? 'config/interfaces');
 $file = "$configDir/{$host}.yml";
 if (!file_exists($file)) {
-    $file = "$configDir/exampledemo.yml";
+    $file = "$configDir/default.yml";
 }
 $cfg = Yaml::parseFile($file);
 
