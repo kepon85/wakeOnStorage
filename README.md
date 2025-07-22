@@ -132,3 +132,15 @@ Utility scripts are provided in `bin/`:
   add under `auth.uniq.password_hash`.
 - `bin/add-user <file> <username> [password]` hashes the password and appends it
   to the specified credentials file.
+
+## Post-up redirection override
+
+You can override the URL displayed after the storage is started by providing a
+`post_up` query parameter. Only the page URL is replaced; the display method
+(iframe or full redirect) remains the one configured for the interface.
+
+Example:
+
+```
+http://localhost:8000/?post_up=https://example.com/path
+```

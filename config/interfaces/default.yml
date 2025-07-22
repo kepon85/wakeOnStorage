@@ -69,7 +69,7 @@ storage:
     timeout: 300 # Temps après lequel on considère qu'il y a un problème
     post:
       methode: redirect-iframe
-      page: https://wakeonstorage-local-test.retzo.net
+      page: http://192.168.1.253:52000/ddusb1/
   down:
     methode: api
     param:

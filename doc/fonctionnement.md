@@ -195,7 +195,7 @@ Aussi il faut  :
 
 Côté interface utilisateur, on va utiliser bootstrap pour le CSS
 
-* Je vois bien une bannière en haut qui occupe ~1/4 de la page 
+* Je vois bien une bannière en haut qui occupe ~1/4 de la page
   * Tout à gauche le logo (que tu peux trouvé dans doc/ sur le dépôt), ensuite les énerges (batterie, solaeil, prochain levé si c'est la nuit, prochain couché si c'est le jour (avec le nombre d'heure restante de soleil si en énergie solar*
-  * Tout à droite un bouton Allumer durant (et là un select avec le nombre de temps de la conf, et un bouton éteindre (grisé ou non selon l'état) un bouton qui symbolise l'état
+  * Tout à droite un bouton **Allumer** avec un sélecteur de durée (valeurs tirées de `wake_time`) et un bouton **Éteindre** (grisé ou non selon l'état) ainsi qu'un indicateur d'état
 * La partie en dessous je sais trop comment l'habiller... Propostion de "storage" quand c'est du texte ça fait un gros "vide"... ? Quand c'est une iframe alors on occupe un max de place.

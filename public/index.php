@@ -21,6 +21,19 @@ if (!file_exists($file)) {
 
 $cfg = Yaml::parseFile($file);
 
+// Allow overriding the post.up page via ?post_up=<url>
+$overridePostUp = $_GET['post_up'] ?? null;
+if ($overridePostUp) {
+    if (!isset($cfg['storage']['up']['post'])) {
+        $cfg['storage']['up']['post'] = [
+            'methode' => 'redirect',
+            'page' => $overridePostUp,
+        ];
+    } else {
+        $cfg['storage']['up']['post']['page'] = $overridePostUp;
+    }
+}
+
 $wakeTimes = $cfg['storage']['wake_time'] ?? [];
 
 $dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
@@ -167,6 +180,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
     <button type="submit" name="schedule_router" class="btn btn-primary">Planifier l'allumage</button>
   </form>
   <div id="router-actions" class="mb-3 d-none">
+    <select id="on-duration" class="form-select d-inline-block w-auto me-2">
+      <?php foreach ($wakeTimes as $t): ?>
+      <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?>h</option>
+      <?php endforeach; ?>
+    </select>
     <button id="btn-on" class="btn btn-success me-2">Allumer</button>
     <button id="btn-off" class="btn btn-danger">Eteindre</button>
   </div>
@@ -347,9 +365,13 @@ function updateAll() {
 }
 $(updateAll);
 
-function doStorageAction(act) {
+function doStorageAction(act, extra) {
   $('#loading').removeClass('d-none');
-  $.post('api.php', {action: act}, function(res) {
+  var data = {action: act};
+  if (extra) {
+    for (var k in extra) data[k] = extra[k];
+  }
+  $.post('api.php', data, function(res) {
     if (res && res.success) {
       notify('info', act === 'storage_up' ? 'Allumage demand\xE9' : 'Extinction demand\xE9e');
       storageSince = 0; // force refresh
@@ -361,7 +383,11 @@ function doStorageAction(act) {
   });
 }
 
-$('#btn-on').on('click', function(e){ e.preventDefault(); doStorageAction('storage_up'); });
+$('#btn-on').on('click', function(e){
+  e.preventDefault();
+  var dur = $('#on-duration').val();
+  doStorageAction('storage_up', {duration: dur});
+});
 $('#btn-off').on('click', function(e){ e.preventDefault(); doStorageAction('storage_down'); });
 </script>
 </body>
