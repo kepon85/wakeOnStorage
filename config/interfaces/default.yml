@@ -13,7 +13,7 @@ auth:
 router:
   router_check:
     methode: ping
-    host: nas.retzoooo.net
+    host: nas.retzo.net
     count: 1
     timeout: 1
   router_up:

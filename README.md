@@ -82,7 +82,8 @@ configurations are located in `config/interfaces/`. Only files prefixed with
 `example` are tracked in Git to avoid leaking secrets.
 
 Set `debug: true` in `global.yml` to include verbose logs about API calls in the
-JSON responses returned by `api.php`.
+JSON responses returned by `api.php`. When enabled, storage actions (`storage_up`
+and `storage_down`) also return the full request and response details.
 
 ## Data sources
 

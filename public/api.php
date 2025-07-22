@@ -69,13 +69,19 @@ if (in_array($action, ['storage_up', 'storage_down'])) {
     $user = $_SESSION[$userKey] ?? '';
     $cfgAct = $cfg['storage'][$action === 'storage_up' ? 'up' : 'down'] ?? null;
     $ok = false;
+    $logAct = [];
     if ($cfgAct) {
-        $ok = Storage::trigger($cfgAct);
+        $ok = Storage::trigger($cfgAct, $debugEnabled, $logAct);
     }
     $stmt = $pdo->prepare("INSERT INTO events (host, action, user, ip) VALUES (?,?,?,?)");
     $stmt->execute([$host, $action, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '']);
     header('Content-Type: application/json');
-    echo json_encode(['success' => $ok]);
+    $resp = ['success' => $ok];
+    if ($debugEnabled) {
+        $resp['debug'] = $logAct;
+        $debugLog = array_merge($debugLog, $logAct);
+    }
+    echo json_encode($resp);
     exit;
 }
 
@@ -198,7 +204,7 @@ if ($now - $forecastSince >= $forecastRefresh && !empty($global['data']['product
 }
 
 if ($now - $storageSince >= $storageRefresh && !empty($cfg['storage']['check'])) {
-    $status = Storage::checkStatus($cfg['storage']['check']);
+    $status = Storage::checkStatus($cfg['storage']['check'], $debugEnabled, $debugLog);
     if ($status !== null) {
         $result['storage'] = ['status' => $status];
     }
