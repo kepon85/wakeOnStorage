@@ -1,0 +1,35 @@
+contact_admin:
+  name: Admin
+  email: admin@example.com
+
+data:
+  batterie:
+    - url: http://wakeonstorage-local.retzo.net:8123/api/states/sensor.batterie1
+      token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI0ZmE0Mzc5ODIxMzM0ZTk4OGQ0N2ZjMDQwMWI3OTNlNCIsImlhdCI6MTc1MjQ5NjcwOSwiZXhwIjoyMDY3ODU2NzA5fQ.GUxMTdSwtngTW0ZbOTBxSYAHpBp_6ewQl6am11MSvYk
+      ttl: 600        # cache lifetime in seconds
+      type: home_assistant
+  production_solaire:
+    url: http://homeassistant-local.retzo.net:8123/api/states/sensor.puissance_corrigee_2
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI0ZmE0Mzc5ODIxMzM0ZTk4OGQ0N2ZjMDQwMWI3OTNlNCIsImlhdCI6MTc1MjQ5NjcwOSwiZXhwIjoyMDY3ODU2NzA5fQ.GUxMTdSwtngTW0ZbOTBxSYAHpBp_6ewQl6am11MSvYk
+    ttl: 600
+    type: home_assistant
+  production_solaire_estimation:
+    url: https://api.solcast.com.au/rooftop_sites/264a-d2d7-20d7-66e5/forecasts?format=json
+    token: WchAGalywMgBjtdubPqAA3ScVwCXTEPr
+    ttl: 10800
+    type: solcast
+
+interface_config_dir: config/interfaces
+
+db_path: data/wakeonstorage.sqlite
+
+# Enable verbose API logging in responses
+debug: false
+
+# Refresh interval (seconds) for AJAX calls (seconds)
+ajax:
+  refresh: 10          # general polling interval
+  router_refresh: 10   # router status refresh interval
+  batterie_refresh: 600
+  production_solaire_refresh: 600
+  production_solaire_estimation_refresh: 1800
