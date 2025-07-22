@@ -226,13 +226,13 @@ function updateAll() {
         actions.removeClass('d-none');
       }
     }
-
     if (data.battery_timestamp) { batterySince = data.battery_timestamp; }
     if (data.solar_timestamp) { solarSince = data.solar_timestamp; }
     if (data.forecast_timestamp) { forecastSince = data.forecast_timestamp; }
     if (data.batterie) console.log('batterie', data.batterie);
     if (data.production_solaire) console.log('prod', data.production_solaire);
     if (data.production_solaire_estimation) console.log('forecast', data.production_solaire_estimation);
+    if (data.debug) console.debug('api debug', data.debug);
   }).always(function() {
     setTimeout(updateAll, refreshInterval);
   });

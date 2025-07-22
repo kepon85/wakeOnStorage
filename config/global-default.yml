@@ -23,6 +23,9 @@ interface_config_dir: config/interfaces
 
 db_path: data/wakeonstorage.sqlite
 
+# Enable verbose API logging in responses
+debug: false
+
 # Refresh interval (seconds) for AJAX calls (seconds)
 ajax:
   refresh: 10          # general polling interval

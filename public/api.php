@@ -20,14 +20,17 @@ function http_get_json(string $url, array $headers = [], int $timeout = 5): ?arr
     return json_decode($res, true);
 }
 
-function cache_fetch(PDO $pdo, string $key, callable $callback, int $ttl): ?array {
+function cache_fetch(PDO $pdo, string $key, callable $callback, int $ttl, bool $debug, array &$log, string $label): ?array {
     $stmt = $pdo->prepare('SELECT value, updated_at FROM data_cache WHERE key=?');
     $stmt->execute([$key]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($row && time() - (int)$row['updated_at'] < $ttl) {
+        if ($debug) $log[] = "$label cache hit";
         return json_decode($row['value'], true);
     }
+    if ($debug) $log[] = "$label cache expired, calling API";
     $data = $callback();
+    if ($debug) $log[] = $data !== null ? "$label API success" : "$label API failed";
     if ($data !== null) {
         $stmt = $pdo->prepare('REPLACE INTO data_cache (key, value, updated_at) VALUES (?,?,?)');
         $stmt->execute([$key, json_encode($data), time()]);
@@ -40,12 +43,14 @@ $override = __DIR__ . '/../config/global.yml';
 if (file_exists($override)) {
     $global = array_replace_recursive($global, Yaml::parseFile($override));
 }
+$debugEnabled = !empty($global['debug']);
+$debugLog = [];
 $host = $_SERVER['HTTP_HOST'] ?? 'default';
 $host = preg_replace('/:\d+$/', '', $host);
 $configDir = __DIR__ . '/../' . ($global['interface_config_dir'] ?? 'config/interfaces');
 $file = "$configDir/{$host}.yml";
 if (!file_exists($file)) {
-    $file = "$configDir/default.yml";
+    $file = "$configDir/exampledemo.yml";
 }
 $cfg = Yaml::parseFile($file);
 
@@ -65,14 +70,7 @@ $solarRefresh = (int)($global['ajax']['production_solaire_refresh'] ?? 600);
 $forecastSince = isset($_GET['forecast_since']) ? (int)$_GET['forecast_since'] : 0;
 $forecastRefresh = (int)($global['ajax']['production_solaire_estimation_refresh'] ?? 1800);
 
-$result = ['timestamp' => $now];
-
-if ($now - $routerSince >= $routerRefresh) {
-    $routerAvailable = true;
-    $nextRouter = null;
-    if (!empty($cfg['router']['router_check'])) {
-        $rc = $cfg['router']['router_check'];
-        if (($rc['methode'] ?? '') === 'ping') {
+@@ -76,101 +81,104 @@ if ($now - $routerSince >= $routerRefresh) {
             $hostCheck = $rc['host'] ?? 'localhost';
             $count = (int)($rc['count'] ?? 1);
             $timeout = (int)($rc['timeout'] ?? 1);
@@ -98,9 +96,9 @@ if ($now - $batterySince >= $batteryRefresh && !empty($global['data']['batterie'
             $headers[] = 'Authorization: Bearer ' . $cfgBat['token'];
         }
         return http_get_json($cfgBat['url'], $headers);
-    }, $ttl);
+    }, $ttl, $debugEnabled, $debugLog, 'BATTERIE');
     $value = $data['state'] ?? null;
-    $result['batterie'] = [$value !== null ? $value : 'NA'];
+    $result['batterie'] = [['value' => ($value !== null ? $value : 'NA')]];
     $result['battery_timestamp'] = $now;
 }
 
@@ -113,9 +111,9 @@ if ($now - $solarSince >= $solarRefresh && !empty($global['data']['production_so
             $headers[] = 'Authorization: Bearer ' . $cfgSolar['token'];
         }
         return http_get_json($cfgSolar['url'], $headers);
-    }, $ttl);
+    }, $ttl, $debugEnabled, $debugLog, 'PROD_SOL');
     $value = $data['state'] ?? null;
-    $result['production_solaire'] = $value !== null ? $value : 'NA';
+    $result['production_solaire'] = ['value' => ($value !== null ? $value : 'NA')];
     $result['solar_timestamp'] = $now;
 }
 
@@ -128,7 +126,7 @@ if ($now - $forecastSince >= $forecastRefresh && !empty($global['data']['product
             $headers[] = 'Authorization: Bearer ' . $cfgFor['token'];
         }
         return http_get_json($cfgFor['url'], $headers);
-    }, $ttl);
+    }, $ttl, $debugEnabled, $debugLog, 'FORECAST');
     $forecast = [];
     if ($raw && !empty($raw['forecasts'])) {
         $nowTs = time();
@@ -167,10 +165,12 @@ if ($now - $forecastSince >= $forecastRefresh && !empty($global['data']['product
             }
         }
     }
-    $result['production_solaire_estimation'] = $forecast ?: 'NA';
+    $result['production_solaire_estimation'] = ['values' => ($forecast ?: 'NA')];
     $result['forecast_timestamp'] = $now;
 }
 
 header('Content-Type: application/json');
+if ($debugEnabled) {
+    $result['debug'] = $debugLog;
+}
 echo json_encode($result);
-

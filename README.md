@@ -81,6 +81,9 @@ Global defaults are stored in `config/global-default.yml`. You may create a
 configurations are located in `config/interfaces/`. Only files prefixed with
 `example` are tracked in Git to avoid leaking secrets.
 
+Set `debug: true` in `global.yml` to include verbose logs about API calls in the
+JSON responses returned by `api.php`.
+
 ## Data sources
 
 `public/api.php` exposes various data points used by the interfaces. Each source
@@ -98,25 +101,11 @@ Available sources:
 
 Each entry defines the API URL, bearer token and cache lifetime (TTL). When the
 cache is older than the TTL the API is queried again; otherwise the stored value
-is returned.
 
-## Data sources
-
-`public/api.php` exposes various data points used by the interfaces. Each source
-is configured under the `data` section of `config/global.yml` with a refresh
-interval declared in `ajax:`. Responses are cached in the SQLite database.
-
-Available sources:
-
-- **batterie** – current battery level read from Home&nbsp;Assistant.
-- **production_solaire** – live solar production value from Home&nbsp;Assistant.
-- **production_solaire_estimation** – forecast from Solcast. Only the portion
-  between now and the next sunset is returned. If the request happens at night,
-  the period between the next sunrise and sunset is used instead.
-
-Each entry defines the API URL, bearer token and cache lifetime (TTL). When the
-cache is older than the TTL the API is queried again; otherwise the stored value
-is returned.
+is returned. Invalid responses (for example when the API is unreachable) are not
+stored, so the next request will retry immediately until a valid value is
+obtained. A `debug` flag can be set in `global.yml` to attach verbose
+information about the API requests to the JSON response.
 
 ## Running
 Use PHP's built-in server for local testing:
