@@ -72,8 +72,9 @@ foreach ($tasks as $t) {
     $cfgAct = $cfg['storage'][$action === 'storage_up' ? 'up' : 'down'] ?? null;
     $ok = false;
     $log = [];
+    $apiInfo = null;
     if ($cfgAct) {
-        $ok = Storage::trigger($cfgAct, $debug, $log);
+        $ok = Storage::trigger($cfgAct, $debug, $log, $apiInfo);
     }
     if ($ok) {
         Logger::logEvent($pdo, $host, $action, 'cron');
@@ -81,13 +82,31 @@ foreach ($tasks as $t) {
         if ($verbose) echo "Success\n";
     } else {
         $attempts = (int)$t['attempts'] + 1;
+        $isConn = $apiInfo && ($apiInfo['info'] ?? '') === 'connections_active';
+        if ($isConn) {
+            Logger::logEvent($pdo, $host, $action . '_conn_active', 'cron');
+            if ($verbose) {
+                $cnt = (int)($apiInfo['count'] ?? 0);
+                echo $cnt . ' connexion' . ($cnt > 1 ? 's' : '') . " en cours, impossible d\x27\xE9teindre\n";
+            }
+        }
         if ($attempts >= $retryMax) {
             Logger::logEvent($pdo, $host, $action . '_fail', 'cron');
             $pdo->prepare('DELETE FROM spool WHERE id=?')->execute([$t['id']]);
-            if ($verbose) echo "Failed\n";
+            if ($verbose) {
+                if ($isConn) {
+                    echo "Failed - connections active\n";
+                } else {
+                    echo "Failed\n";
+                }
+            }
         } else {
             $pdo->prepare('UPDATE spool SET attempts=? WHERE id=?')->execute([$attempts, $t['id']]);
-            if ($verbose) echo "Retry $attempts\n";
+            if ($verbose) {
+                $msg = 'Retry ' . $attempts;
+                if ($isConn) $msg .= ' (connections active)';
+                echo $msg . "\n";
+            }
         }
     }
 }

@@ -37,7 +37,7 @@ ajax:
 
 # Spooler configuration
 spooler:
-  max_attempts: 3       # retry attempts for failed actions
+  max_attempts: 999999       # retry attempts for failed actions
 
 # Maximum number of rows kept in events table
 events:

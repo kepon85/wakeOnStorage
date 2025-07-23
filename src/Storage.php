@@ -109,7 +109,7 @@ class Storage
     /**
      * Trigger an action (up/down) using API method.
      */
-    public static function trigger(array $cfg, bool $debug = false, ?array &$log = null): bool
+    public static function trigger(array $cfg, bool $debug = false, ?array &$log = null, ?array &$rawResponse = null): bool
     {
         $method = $cfg['methode'] ?? '';
         if ($method === 'api') {
@@ -121,6 +121,10 @@ class Storage
                 }
                 return false;
             }
+            $json = json_decode($res['body'], true);
+            if (func_num_args() >= 4) {
+                $rawResponse = $json;
+            }
             $exp = $param['expected_result']['status_code'] ?? null;
             if ($exp && $res['status'] != $exp) {
                 if ($debug && is_array($log)) {
@@ -129,7 +133,6 @@ class Storage
                 return false;
             }
             if (!empty($param['expected_result']['json'])) {
-                $json = json_decode($res['body'], true);
                 if ($json === null) {
                     return false;
                 }

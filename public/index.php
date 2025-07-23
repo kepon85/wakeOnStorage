@@ -439,6 +439,12 @@ function doStorageAction(act, extra) {
           txt += 'une date inconnue';
         }
         notify('warn', txt, 5000);
+      } else if (act === 'storage_down' && res.reason === 'connections_active') {
+        var cnt = res.count || 0;
+        var msg = cnt + ' connexion';
+        if (cnt > 1) msg += 's';
+        msg += " en cours sur ce storage, il ne peut \xEAtre \xE9teint, veuillez r\xE9essayer ult\xE9rieurement";
+        notify('warn', msg, 5000);
       } else {
         notify('warn', 'Erreur lors de l\'action');
       }

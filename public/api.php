@@ -76,8 +76,9 @@ if (in_array($action, ['storage_up', 'storage_down', 'extend_up'])) {
     $logAct = [];
     if ($action === 'storage_up') {
         $cfgAct = $cfg['storage']['up'] ?? null;
+        $apiInfo = null;
         if ($cfgAct) {
-            $ok = Storage::trigger($cfgAct, $debugEnabled, $logAct);
+            $ok = Storage::trigger($cfgAct, $debugEnabled, $logAct, $apiInfo);
         }
         $stmt = $pdo->prepare("INSERT INTO events (host, action, user, ip) VALUES (?,?,?,?)");
         $stmt->execute([$host, $action, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '']);
@@ -102,6 +103,7 @@ if (in_array($action, ['storage_up', 'storage_down', 'extend_up'])) {
         }
     } elseif ($action === 'storage_down') {
         $reason = null;
+        $connCount = 0;
         $stmt = $pdo->prepare("SELECT id, run_at, user, ip FROM spool WHERE host=? AND action='storage_down' ORDER BY run_at DESC LIMIT 1");
         $stmt->execute([$host]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -119,14 +121,19 @@ if (in_array($action, ['storage_up', 'storage_down', 'extend_up'])) {
         }
         if ($allow) {
             $cfgAct = $cfg['storage']['down'] ?? null;
+            $apiInfo = null;
             if ($cfgAct) {
-                $ok = Storage::trigger($cfgAct, $debugEnabled, $logAct);
+                $ok = Storage::trigger($cfgAct, $debugEnabled, $logAct, $apiInfo);
             }
             $stmt = $pdo->prepare("INSERT INTO events (host, action, user, ip) VALUES (?,?,?,?)");
             $stmt->execute([$host, $action, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '']);
             if ($ok) {
                 $pdo->prepare("DELETE FROM spool WHERE host=? AND action='storage_down'")->execute([$host]);
                 Logger::logEvent($pdo, $host, 'storage_down', is_string($user) ? $user : '');
+            } elseif ($apiInfo && ($apiInfo['info'] ?? '') === 'connections_active') {
+                $reason = 'connections_active';
+                $connCount = (int)($apiInfo['count'] ?? 0);
+                Logger::logEvent($pdo, $host, 'storage_down_conn_active', is_string($user) ? $user : '');
             }
         } else {
             $ok = false;
@@ -163,6 +170,9 @@ if (in_array($action, ['storage_up', 'storage_down', 'extend_up'])) {
             $resp['scheduled_down'] = $scheduledRun;
             $resp['scheduled_down_user'] = $scheduledUser ?? '';
             $resp['scheduled_down_ip'] = $scheduledIp ?? '';
+        }
+        if ($reason === 'connections_active') {
+            $resp['count'] = $connCount ?? 0;
         }
     }
     if ($debugEnabled) {
