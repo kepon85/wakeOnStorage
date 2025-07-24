@@ -141,7 +141,7 @@ On va prendre ici quelques exemples :
 Le fonctionnement de l'interface : 
 
 * Si le routeur n'est pas jouaniable : on dit à quel heure il le sera normalement
-  * Si on souhait planifier un allumage c'est possible (selon les contraintes de production solaire et les contraintes d'énergie spécifique à chaque internface) on indique une heure de fin (heure du début étant l'allumage planifier du routeur)
+  * Si on souhait planifier un allumage c'est possible (selon les contraintes de production solaire et les contraintes d'énergie spécifique à chaque internface). On peut choisir "dès que possible" ou l'un des horaires définis dans `router.router_up` (par exemple 9h ou 12h) pour le début, puis on indique une heure de fin (durée d'allumage).
     * Un e-mail est envoyé (avec moi en copie caché systématique) :
       * Si la planification a fonctionne on envoi un e-mail pour dire que c'est jouaniable (fonction de ce qu'il y a dans up/post/methode) et on indique le temps 
       * Si la planification à échoué on envoi un e-mail pour le signaler en indiquer d'aller vers l'admin (adresse de contact) pour investigation...

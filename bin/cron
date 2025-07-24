@@ -119,8 +119,15 @@ foreach ($tasks as $t) {
             $downAt = null;
             if ($duration > 0) {
                 $downAt = time() + (int)($duration * 3600);
-                $pdo->prepare('INSERT INTO spool (host, action, run_at, user, ip, email) VALUES (?,?,?,?,?,?)')
-                    ->execute([$host, 'storage_down', $downAt, $t['user'], $t['ip'], '']);
+                $row = $pdo->prepare("SELECT id FROM spool WHERE host=? AND action='storage_down' AND user=? AND ip=? LIMIT 1");
+                $row->execute([$host, $t['user'], $t['ip']]);
+                $d = $row->fetch(PDO::FETCH_ASSOC);
+                if ($d) {
+                    $pdo->prepare('UPDATE spool SET run_at=? WHERE id=?')->execute([$downAt, $d['id']]);
+                } else {
+                    $pdo->prepare('INSERT INTO spool (host, action, run_at, user, ip, email) VALUES (?,?,?,?,?,?)')
+                        ->execute([$host, 'storage_down', $downAt, $t['user'], $t['ip'], '']);
+                }
                 Logger::logEvent($pdo, $host, 'schedule_down', 'cron');
             }
             if (!empty($t['email'])) {

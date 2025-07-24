@@ -36,6 +36,26 @@ if ($overridePostUp) {
 }
 
 $wakeTimes = $cfg['storage']['wake_time'] ?? [];
+$routerUps = $cfg['router']['router_up'] ?? [];
+$routerUpOptions = [];
+if ($routerUps) {
+    $now = new \DateTimeImmutable('now');
+    foreach ($routerUps as $t) {
+        $label = trim($t);
+        $dt = \DateTimeImmutable::createFromFormat('H:i', $label);
+        if ($dt) {
+            $candidate = $dt->setDate(
+                (int)$now->format('Y'),
+                (int)$now->format('m'),
+                (int)$now->format('d')
+            );
+            if ($candidate <= $now) {
+                $label .= ' (Demain)';
+            }
+        }
+        $routerUpOptions[] = ['value' => $t, 'label' => $label];
+    }
+}
 
 $dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
 $dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
@@ -146,14 +166,29 @@ if ($action === 'up' || $action === 'down') {
 }
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
     $end = $_POST['router_end'] ?? '';
+    $startOpt = $_POST['router_start'] ?? 'asap';
     $notify = filter_var($_POST['notify_email'] ?? '', FILTER_VALIDATE_EMAIL);
     $durHours = floatval($end);
+    $runAt = time();
+    if ($startOpt && $startOpt !== 'asap') {
+        $tm = \DateTimeImmutable::createFromFormat('H:i', $startOpt);
+        if ($tm) {
+            $now = new \DateTimeImmutable('now');
+            $cand = $tm->setDate((int)$now->format('Y'), (int)$now->format('m'), (int)$now->format('d'));
+            if ($cand <= $now) {
+                $cand = $cand->modify('+1 day');
+            }
+            $runAt = $cand->getTimestamp();
+        }
+    }
+    $downAt = $durHours > 0 ? $runAt + (int)($durHours * 3600) : 0;
     Logger::logEvent($pdo, $host, 'router_schedule', $authenticatedUser);
     $row = $pdo->prepare("SELECT id FROM spool WHERE host=? AND action='storage_up' LIMIT 1");
     $row->execute([$host]);
     $r = $row->fetch(PDO::FETCH_ASSOC);
     if ($r) {
-        $pdo->prepare('UPDATE spool SET email=?, duration=?, user=?, ip=? WHERE id=?')->execute([
+        $pdo->prepare('UPDATE spool SET run_at=?, email=?, duration=?, user=?, ip=? WHERE id=?')->execute([
+            $runAt,
             $notify ?: '',
             $durHours,
             is_string($authenticatedUser) ? $authenticatedUser : '',
@@ -165,12 +200,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
             ->execute([
                 $host,
                 'storage_up',
-                time(),
+                $runAt,
                 is_string($authenticatedUser) ? $authenticatedUser : '',
                 $_SERVER['REMOTE_ADDR'] ?? '',
                 $notify ?: '',
                 $durHours
             ]);
+    }
+    if ($downAt > 0) {
+        $row = $pdo->prepare("SELECT id FROM spool WHERE host=? AND action='storage_down' AND user=? AND ip=? LIMIT 1");
+        $row->execute([
+            $host,
+            is_string($authenticatedUser) ? $authenticatedUser : '',
+            $_SERVER['REMOTE_ADDR'] ?? ''
+        ]);
+        $d = $row->fetch(PDO::FETCH_ASSOC);
+        if ($d) {
+            $pdo->prepare('UPDATE spool SET run_at=? WHERE id=?')->execute([$downAt, $d['id']]);
+        } else {
+            $pdo->prepare('INSERT INTO spool (host, action, run_at, user, ip, email) VALUES (?,?,?,?,?,?)')
+                ->execute([
+                    $host,
+                    'storage_down',
+                    $downAt,
+                    is_string($authenticatedUser) ? $authenticatedUser : '',
+                    $_SERVER['REMOTE_ADDR'] ?? '',
+                    ''
+                ]);
+        }
     }
     $to = $global['contact_admin']['email'] ?? '';
     if ($to) {
@@ -208,6 +265,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
   <form id="router-plan" method="post" class="mb-3 d-none">
     <div class="mb-3">
       <p id="router-msg">Le storage ne peut être allumé pour le moment.</p>
+      <label class="form-label">Allumage</label>
+      <select name="router_start" class="form-select mb-2">
+        <option value="asap">Dès que possible</option>
+        <?php foreach ($routerUpOptions as $opt): ?>
+        <option value="<?= htmlspecialchars($opt['value']) ?>"><?= htmlspecialchars($opt['label']) ?></option>
+        <?php endforeach; ?>
+      </select>
       <label class="form-label">Durée d'allumage</label>
       <select name="router_end" class="form-select">
         <?php foreach ($wakeTimes as $t): ?>

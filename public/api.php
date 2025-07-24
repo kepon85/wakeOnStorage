@@ -173,6 +173,12 @@ if (in_array($action, ['storage_up', 'storage_down', 'extend_up', 'cancel_up']))
         $stmt = $pdo->prepare("DELETE FROM spool WHERE host=? AND action='storage_up'");
         $stmt->execute([$host]);
         $ok = $stmt->rowCount() > 0;
+        $stmt2 = $pdo->prepare("DELETE FROM spool WHERE host=? AND action='storage_down' AND user=? AND ip=?");
+        $stmt2->execute([
+            $host,
+            is_string($user) ? $user : '',
+            $_SERVER['REMOTE_ADDR'] ?? ''
+        ]);
         Logger::logEvent($pdo, $host, 'cancel_up', is_string($user) ? $user : '');
     }
     header('Content-Type: application/json');
