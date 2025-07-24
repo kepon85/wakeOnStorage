@@ -5,6 +5,7 @@ require __DIR__ . '/../vendor/autoload.php';
 use Symfony\Component\Yaml\Yaml;
 use WakeOnStorage\Storage;
 use WakeOnStorage\Logger;
+use WakeOnStorage\Router;
 
 $opts = getopt('v', ['verbose', 'debug']);
 $verbose = isset($opts['v']) || isset($opts['verbose']);
@@ -42,6 +43,8 @@ $stmt = $pdo->prepare('SELECT * FROM spool WHERE run_at <= ? ORDER BY run_at ASC
 $stmt->execute([$now]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+
+
 foreach ($tasks as $t) {
     $host = $t['host'];
     $action = $t['action'];
@@ -58,6 +61,26 @@ foreach ($tasks as $t) {
         continue;
     }
     $cfg = Yaml::parseFile($file);
+
+    $routerOk = true;
+    if (!empty($cfg['router']['router_check'])) {
+        $rc = $cfg['router']['router_check'];
+        if (($rc['methode'] ?? '') === 'ping') {
+            $hostCheck = $rc['host'] ?? 'localhost';
+            $count = (int)($rc['count'] ?? 1);
+            $timeout = (int)($rc['timeout'] ?? 1);
+            $routerOk = Router::ping($hostCheck, $count, $timeout);
+            Logger::logEvent($pdo, 'router', $routerOk ? 'ping_ok' : 'ping_fail', 'cron');
+            if ($verbose) {
+                echo ($routerOk ? "Router ping OK\n" : "Router ping failed\n");
+            }
+        }
+    }
+    if (!$routerOk) {
+        if ($verbose) echo "Router unreachable, skipping\n";
+        continue;
+    }
+
     $desired = $action === 'storage_up' ? 'up' : 'down';
     $status = null;
     if (!empty($cfg['storage']['check'])) {
