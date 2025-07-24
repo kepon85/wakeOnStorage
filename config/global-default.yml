@@ -1,6 +1,16 @@
 contact_admin:
   name: Admin
   email: admin@example.com
+mail:
+  host: localhost
+  port: 25
+  secure: 
+  username: 
+  password: 
+  novalid_cert: false
+  bcc:
+  storage_up_subject: "Storage {{host}} UP"
+  storage_up_body: "Bonjour,\n\nLe stockage {{host}} est maintenant disponible jusqu'au {{until}} ({{duration}}).\nVous pouvez prolonger cette durée via https://{{host}}."
 
 data:
   batterie:

@@ -5,6 +5,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use Symfony\Component\Yaml\Yaml;
 use WakeOnStorage\Auth;
 use WakeOnStorage\Logger;
+use WakeOnStorage\Mailer;
 
 $global = Yaml::parseFile(__DIR__ . '/../config/global-default.yml');
 $override = __DIR__ . '/../config/global.yml';
@@ -51,7 +52,15 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS events (
 $pdo->exec("CREATE TABLE IF NOT EXISTS spool (".
     "id INTEGER PRIMARY KEY AUTOINCREMENT,".
     " host TEXT, action TEXT, run_at INTEGER,".
-    " user TEXT, ip TEXT, attempts INTEGER DEFAULT 0)");
+    " user TEXT, ip TEXT, email TEXT, duration REAL DEFAULT 0,".
+    " attempts INTEGER DEFAULT 0)");
+$cols = $pdo->query("PRAGMA table_info(spool)")->fetchAll(PDO::FETCH_COLUMN,1);
+if (!in_array('email', $cols)) {
+    $pdo->exec("ALTER TABLE spool ADD COLUMN email TEXT");
+}
+if (!in_array('duration', $cols)) {
+    $pdo->exec("ALTER TABLE spool ADD COLUMN duration REAL DEFAULT 0");
+}
 $authMethods = $cfg['auth']['method'] ?? ['none'];
 $authKey = 'wos_auth_' . $host;
 $authenticatedUser = $_SESSION[$authKey] ?? null;
@@ -137,12 +146,37 @@ if ($action === 'up' || $action === 'down') {
 }
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
     $end = $_POST['router_end'] ?? '';
+    $notify = filter_var($_POST['notify_email'] ?? '', FILTER_VALIDATE_EMAIL);
+    $durHours = floatval($end);
     Logger::logEvent($pdo, $host, 'router_schedule', $authenticatedUser);
+    $row = $pdo->prepare("SELECT id FROM spool WHERE host=? AND action='storage_up' LIMIT 1");
+    $row->execute([$host]);
+    $r = $row->fetch(PDO::FETCH_ASSOC);
+    if ($r) {
+        $pdo->prepare('UPDATE spool SET email=?, duration=?, user=?, ip=? WHERE id=?')->execute([
+            $notify ?: '',
+            $durHours,
+            is_string($authenticatedUser) ? $authenticatedUser : '',
+            $_SERVER['REMOTE_ADDR'] ?? '',
+            $r['id']
+        ]);
+    } else {
+        $pdo->prepare('INSERT INTO spool (host, action, run_at, user, ip, email, duration) VALUES (?,?,?,?,?,?,?)')
+            ->execute([
+                $host,
+                'storage_up',
+                time(),
+                is_string($authenticatedUser) ? $authenticatedUser : '',
+                $_SERVER['REMOTE_ADDR'] ?? '',
+                $notify ?: '',
+                $durHours
+            ]);
+    }
     $to = $global['contact_admin']['email'] ?? '';
     if ($to) {
         $subject = '[WOS] Planification routeur';
         $body = "Utilisateur $authenticatedUser a demande l'allumage du routeur sur $host jusqu'a $end.";
-        @mail($to, $subject, $body);
+        Mailer::send($global['mail'] ?? [], $global['contact_admin']['name'] ?? 'Admin', $to, $to, $subject, $body);
     }
     $message = 'Planification envoy\xC3\xA9e';
 }
@@ -181,7 +215,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
         <?php endforeach; ?>
       </select>
     </div>
+    <div class="mb-3">
+      <label class="form-label">E-mail de notification (optionnel)</label>
+      <input type="email" name="notify_email" class="form-control">
+    </div>
     <button type="submit" name="schedule_router" class="btn btn-primary">Planifier l'allumage</button>
+    <button type="button" id="cancel-start" class="btn btn-danger ms-2 d-none">Annuler la demande</button>
   </form>
   <div id="router-actions" class="mb-3 d-none">
     <select id="on-duration" class="form-select d-inline-block w-auto me-2">
@@ -342,9 +381,17 @@ function updateAll() {
           updateCountdown();
         } else {
           nextRouterDate = null;
-          $('#router-msg').text('Le storage ne peut être allumé pour le moment.');
         }
         if (!routerNote) routerNote = notify('warn', msg, 0); else routerNote.text(msg);
+        if (data.router.pending_start) {
+          plan.find('button[name="schedule_router"]').prop('disabled', true);
+          $('#cancel-start').removeClass('d-none');
+          $('#router-msg').text('Une demande d\'allumage est en attente.');
+        } else {
+          plan.find('button[name="schedule_router"]').prop('disabled', false);
+          $('#cancel-start').addClass('d-none');
+          $('#router-msg').text('Le storage ne peut être allumé pour le moment.');
+        }
         plan.removeClass('d-none');
         actions.addClass('d-none');
       } else {
@@ -471,6 +518,15 @@ $('#btn-extend').on('click', function(e){
   e.preventDefault();
   var dur = $('#on-duration').val();
   doStorageAction('extend_up', {duration: dur});
+});
+
+$('#cancel-start').on('click', function(e){
+  e.preventDefault();
+  $.post('api.php', {action: 'cancel_up'}, function(){
+    notify('info', 'Demande annulée');
+    routerSince = 0;
+    updateAll();
+  }, 'json');
 });
 </script>
 </body>

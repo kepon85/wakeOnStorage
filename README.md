@@ -108,6 +108,31 @@ stored, so the next request will retry immediately until a valid value is
 obtained. A `debug` flag can be set in `global.yml` to attach verbose
 information about the API requests to the JSON response.
 
+## Mail settings
+Configure SMTP parameters under `mail` in `global.yml`.
+Example:
+
+```yaml
+mail:
+  host: localhost
+  port: 25
+  secure: tls # or ssl
+  username: user
+  password: pass
+  novalid_cert: false
+  bcc: admin@example.com
+  storage_up_subject: "Storage {{host}} UP"
+  storage_up_body: |
+    Le stockage {{host}} est maintenant disponible jusqu'au {{until}} ({{duration}}).
+    Vous pouvez prolonger cette durée via https://{{host}}.
+```
+
+`{{host}}` sera remplacé par le nom d'hôte de l'interface. `{{until}}` indique la
+date et l'heure prévues pour l'arrêt et `{{duration}}` la durée restante avant
+cet arrêt. Si aucune extinction n'est planifiée, ces variables seront vides.
+
+These values are used by `bin/cron` to notify users when a scheduled start succeeds.
+
 ## Running
 Use PHP's built-in server for local testing:
 

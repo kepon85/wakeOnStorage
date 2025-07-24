@@ -6,6 +6,7 @@ use Symfony\Component\Yaml\Yaml;
 use WakeOnStorage\Storage;
 use WakeOnStorage\Logger;
 use WakeOnStorage\Router;
+use WakeOnStorage\Mailer;
 
 $opts = getopt('v', ['verbose', 'debug']);
 $verbose = isset($opts['v']) || isset($opts['verbose']);
@@ -16,6 +17,9 @@ $override = __DIR__ . '/../config/global.yml';
 if (file_exists($override)) {
     $global = array_replace_recursive($global, Yaml::parseFile($override));
 }
+$mailCfg = $global["mail"] ?? [];
+$fromName = $global["contact_admin"]["name"] ?? "Admin";
+$fromEmail = $global["contact_admin"]["email"] ?? "";
 
 $dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
 $dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
@@ -24,7 +28,15 @@ $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->exec("CREATE TABLE IF NOT EXISTS spool (".
     "id INTEGER PRIMARY KEY AUTOINCREMENT,".
     " host TEXT, action TEXT, run_at INTEGER,".
-    " user TEXT, ip TEXT, attempts INTEGER DEFAULT 0)");
+    " user TEXT, ip TEXT, email TEXT, duration REAL DEFAULT 0,".
+    " attempts INTEGER DEFAULT 0)");
+$cols = $pdo->query("PRAGMA table_info(spool)")->fetchAll(PDO::FETCH_COLUMN,1);
+if (!in_array('email', $cols)) {
+    $pdo->exec("ALTER TABLE spool ADD COLUMN email TEXT");
+}
+if (!in_array('duration', $cols)) {
+    $pdo->exec("ALTER TABLE spool ADD COLUMN duration REAL DEFAULT 0");
+}
 $pdo->exec("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT, action TEXT, user TEXT, ip TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
 
 // Purge old events if over limit
@@ -102,6 +114,29 @@ foreach ($tasks as $t) {
     if ($ok) {
         Logger::logEvent($pdo, $host, $action, 'cron');
         $pdo->prepare('DELETE FROM spool WHERE id=?')->execute([$t['id']]);
+        if ($action === 'storage_up') {
+            $duration = floatval($t['duration'] ?? 0);
+            $downAt = null;
+            if ($duration > 0) {
+                $downAt = time() + (int)($duration * 3600);
+                $pdo->prepare('INSERT INTO spool (host, action, run_at, user, ip, email) VALUES (?,?,?,?,?,?)')
+                    ->execute([$host, 'storage_down', $downAt, $t['user'], $t['ip'], '']);
+                Logger::logEvent($pdo, $host, 'schedule_down', 'cron');
+            }
+            if (!empty($t['email'])) {
+                $until = $downAt ? date('d/m/Y H:i', $downAt) : '';
+                $dur = $downAt ? round(($downAt - time()) / 3600, 1) . 'h' : '';
+                $subj = $mailCfg['storage_up_subject'] ?? 'Storage ' . $host . ' UP';
+                $body = $mailCfg['storage_up_body'] ?? (
+                    'Le stockage ' . $host . ' est maintenant disponible.'
+                );
+                $search = ['{{host}}', '{{until}}', '{{duration}}'];
+                $replace = [$host, $until, $dur];
+                $subj = str_replace($search, $replace, $subj);
+                $body = str_replace($search, $replace, $body);
+                Mailer::send($mailCfg, $fromName, $fromEmail, $t['email'], $subj, $body);
+            }
+        }
         if ($verbose) echo "Success\n";
     } else {
         $attempts = (int)$t['attempts'] + 1;

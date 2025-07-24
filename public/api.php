@@ -66,10 +66,18 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREM
 $pdo->exec("CREATE TABLE IF NOT EXISTS spool (".
     "id INTEGER PRIMARY KEY AUTOINCREMENT,".
     " host TEXT, action TEXT, run_at INTEGER,".
-    " user TEXT, ip TEXT, attempts INTEGER DEFAULT 0)");
+    " user TEXT, ip TEXT, email TEXT, duration REAL DEFAULT 0,".
+    " attempts INTEGER DEFAULT 0)");
+$cols = $pdo->query("PRAGMA table_info(spool)")->fetchAll(PDO::FETCH_COLUMN,1);
+if (!in_array('email', $cols)) {
+    $pdo->exec("ALTER TABLE spool ADD COLUMN email TEXT");
+}
+if (!in_array('duration', $cols)) {
+    $pdo->exec("ALTER TABLE spool ADD COLUMN duration REAL DEFAULT 0");
+}
 
 $action = $_POST['action'] ?? ($_GET['action'] ?? null);
-if (in_array($action, ['storage_up', 'storage_down', 'extend_up'])) {
+if (in_array($action, ['storage_up', 'storage_down', 'extend_up', 'cancel_up'])) {
     $userKey = 'wos_auth_' . $host;
     $user = $_SESSION[$userKey] ?? '';
     $ok = false;
@@ -95,8 +103,8 @@ if (in_array($action, ['storage_up', 'storage_down', 'extend_up'])) {
                         $upd->execute([$runAt, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '', $r['id']]);
                     }
                 } else {
-                    $ins = $pdo->prepare('INSERT INTO spool (host, action, run_at, user, ip) VALUES (?,?,?,?,?)');
-                    $ins->execute([$host, 'storage_down', $runAt, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '']);
+                    $ins = $pdo->prepare('INSERT INTO spool (host, action, run_at, user, ip, email) VALUES (?,?,?,?,?,?)');
+                    $ins->execute([$host, 'storage_down', $runAt, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '', '']);
                 }
                 Logger::logEvent($pdo, $host, 'schedule_down', is_string($user) ? $user : '');
             }
@@ -155,12 +163,17 @@ if (in_array($action, ['storage_up', 'storage_down', 'extend_up'])) {
                 ]);
             } else {
                 $newRun = time() + $add;
-                $pdo->prepare('INSERT INTO spool (host, action, run_at, user, ip) VALUES (?,?,?,?,?)')
-                    ->execute([$host, 'storage_down', $newRun, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '']);
+                $pdo->prepare('INSERT INTO spool (host, action, run_at, user, ip, email) VALUES (?,?,?,?,?,?)')
+                    ->execute([$host, 'storage_down', $newRun, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '', '']);
             }
             Logger::logEvent($pdo, $host, 'extend_up', is_string($user) ? $user : '');
             $ok = true;
         }
+    } elseif ($action === 'cancel_up') {
+        $stmt = $pdo->prepare("DELETE FROM spool WHERE host=? AND action='storage_up'");
+        $stmt->execute([$host]);
+        $ok = $stmt->rowCount() > 0;
+        Logger::logEvent($pdo, $host, 'cancel_up', is_string($user) ? $user : '');
     }
     header('Content-Type: application/json');
     $resp = ['success' => $ok];
@@ -212,9 +225,13 @@ if ($now - $routerSince >= $routerRefresh) {
     if (!$routerAvailable) {
         $nextRouter = Router::nextSchedule($cfg['router']['router_up'] ?? []);
     }
+    $stmtPend = $pdo->prepare("SELECT 1 FROM spool WHERE host=? AND action='storage_up' LIMIT 1");
+    $stmtPend->execute([$host]);
+    $pendingUp = $stmtPend->fetchColumn() !== false;
     $result['router'] = [
         'available' => $routerAvailable,
         'next' => $nextRouter,
+        'pending_start' => $pendingUp,
     ];
     $result['router_timestamp'] = $now;
 }
