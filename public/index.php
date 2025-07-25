@@ -339,6 +339,11 @@ var storageConso = <?php echo (int)($cfg['storage']['conso'] ?? 0); ?>;
 var energyMode = <?php echo json_encode($cfg['energy']['mode'] ?? 'all'); ?>;
 var batteryCfg = <?php echo json_encode($cfg['energy']['batterie'] ?? []); ?>;
 var wakeTimesJs = <?php echo json_encode($wakeTimes); ?>;
+var storageUpTime = <?php echo (int)($cfg['storage']['up']['time'] ?? 0); ?>;
+var storageUpTimeout = <?php echo (int)($cfg['storage']['up']['timeout'] ?? 0); ?>;
+var storageDownTime = <?php echo (int)($cfg['storage']['down']['time'] ?? 0); ?>;
+var storageDownTimeout = <?php echo (int)($cfg['storage']['down']['timeout'] ?? 0); ?>;
+var waitStatus = null;
 
 function showPostUp() {
   if (!storagePostUp || storagePostUpShown) return;
@@ -670,6 +675,22 @@ function updateAll() {
             }
             lastStorageStatus = data.storage.status;
         }
+        if (waitStatus) {
+            var desired = waitStatus.action;
+            if (data.storage.status === desired) {
+                $('#loading').addClass('d-none');
+                waitStatus = null;
+            } else {
+                var elapsed = Date.now() - waitStatus.start;
+                if (waitStatus.timeout > 0 && elapsed > waitStatus.timeout) {
+                    $('#loading-text').text("Le délai est dépassé, désolé veuillez contacter l'administrateur, un problème est certainement survenu");
+                    setTimeout(function(){ $('#loading').addClass('d-none'); }, 5000);
+                    waitStatus = null;
+                } else if (waitStatus.time > 0 && elapsed > waitStatus.time) {
+                    $('#loading-text').text("C'est un peu long mais ça peut encore venir");
+                }
+            }
+        }
     }
     displayEnergy(data);
     applyEnergyRules(data);
@@ -700,6 +721,21 @@ function doStorageAction(act, extra) {
       else if (act === 'extend_up') msg = 'Prolongation demand\xE9e';
       notify('info', msg);
       storageSince = 0; // force refresh
+      if (act === 'storage_up' || act === 'storage_down') {
+        var t = act === 'storage_up' ? storageUpTime : storageDownTime;
+        var to = act === 'storage_up' ? storageUpTimeout : storageDownTimeout;
+        waitStatus = {
+          action: act === 'storage_up' ? 'up' : 'down',
+          start: Date.now(),
+          time: t * 1000,
+          timeout: to * 1000
+        };
+        var txt = act === 'storage_up' ? 'Allumage demand\xE9... patience' : 'Extinction demand\xE9e... patience';
+        $('#loading-text').text(txt);
+        $('#loading').removeClass('d-none');
+        updateAll();
+        return;
+      }
     } else {
       if (act === 'storage_down' && res.reason === 'not_owner') {
         var when = res.scheduled_down ? new Date(res.scheduled_down * 1000) : null;
@@ -721,7 +757,7 @@ function doStorageAction(act, extra) {
       }
     }
   }, 'json').always(function(){
-    $('#loading').addClass('d-none');
+    if (!waitStatus) $('#loading').addClass('d-none');
   });
 }
 
