@@ -300,8 +300,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
     Le storage va s'arrêter dans <span id="down-time">--</span>.
   </div>
   <div id="storage-content" class="mb-3"></div>
-  <div id="loading" class="position-fixed top-0 bottom-0 start-0 end-0 bg-light bg-opacity-75 d-none justify-content-center align-items-center" style="z-index:1060;">
-    <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+  <div id="loading" style="" class="position-fixed top-0 bottom-0 start-0 end-0 bg-white bg-opacity-50 d-flex flex-column justify-content-center align-items-center" style="z-index:1060;">
+    <img src="./img/load.gif" alt="loading" class="mb-3" style="max-width:175px;">
+    <p id="loading-text" class="h5 mb-0">Requête sur le serveur en cours...</p>
   </div>
 </div>
 <?php if (!empty($cfg['interface']['js_include'])): foreach ($cfg['interface']['js_include'] as $js): ?>
@@ -323,6 +324,7 @@ var storagePostDown = <?php echo json_encode($cfg['storage']['down']['post'] ?? 
 var lastStorageStatus = null;
 var storagePostUpShown = false;
 var storagePostDownShown = false;
+var firstUpdate = true;
 
 function showPostUp() {
   if (!storagePostUp || storagePostUpShown) return;
@@ -423,6 +425,10 @@ setInterval(updateCountdown, 60000);
 setInterval(updateDownCountdown, 60000);
 
 function updateAll() {
+  if (firstUpdate) {
+    $('#loading-text').text('Requête sur le serveur en cours...');
+    $('#loading').removeClass('d-none');
+  }
   $.getJSON('api.php', {
       router_since: routerSince,
       battery_since: batterySince,
@@ -521,12 +527,17 @@ function updateAll() {
     if (data.production_solaire_estimation) console.log('forecast', data.production_solaire_estimation);
     if (data.debug) console.debug('api debug', data.debug);
   }).always(function() {
+    if (firstUpdate) {
+      $('#loading').addClass('d-none');
+      firstUpdate = false;
+    }
     setTimeout(updateAll, refreshInterval);
   });
 }
 $(updateAll);
 
 function doStorageAction(act, extra) {
+  $('#loading-text').text('Action demandée, merci de patienter...');
   $('#loading').removeClass('d-none');
   var data = {action: act};
   if (extra) {
