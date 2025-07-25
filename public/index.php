@@ -22,6 +22,30 @@ if (!file_exists($file)) {
 
 $cfg = Yaml::parseFile($file);
 
+$maintenanceActive = !empty($global['maintenance']);
+$maintenanceMessage = $global['maintenance_message'] ?? '';
+if ($maintenanceActive) {
+    ?>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Maintenance</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="container mt-5 text-center">
+<?php if (!empty($cfg['interface']['logo'])): ?>
+<img src="<?= htmlspecialchars($cfg['interface']['logo']) ?>" alt="logo" class="mb-4" style="max-height:150px;">
+<?php endif; ?>
+<?= $maintenanceMessage ?: '<p>En maintenance...</p>' ?>
+</body>
+</html>
+<?php
+    exit;
+}
+
+$maintenanceBanner = $maintenanceMessage;
+
 // Allow overriding the post.up page via ?post_up=<url>
 $overridePostUp = $_GET['post_up'] ?? null;
 if ($overridePostUp) {
@@ -256,6 +280,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
     <?php endif; ?>
     <h1 class="h4"><?= htmlspecialchars($cfg['interface']['name'] ?? '') ?></h1>
   </header>
+  <?php if ($maintenanceBanner): ?>
+  <div class="alert alert-warning text-center mb-3"><?php echo $maintenanceBanner; ?></div>
+  <?php endif; ?>
 
   <div id="notifications" class="position-fixed top-0 end-0 p-3" style="z-index:1051;"></div>
   <?php if ($message): ?>

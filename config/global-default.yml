@@ -36,6 +36,13 @@ db_path: data/wakeonstorage.sqlite
 # Enable verbose API logging in responses
 debug: false
 
+# Global maintenance mode. When true, the interface only displays the message
+# below and skips all API calls.
+maintenance: false
+# Optional HTML message displayed when maintenance is active. If set while
+# maintenance is false, the message will still appear as a non-blocking notice.
+maintenance_message: ""
+
 # Refresh interval (seconds) for AJAX calls (seconds)
 ajax:
   refresh: 10          # general polling interval
