@@ -178,6 +178,10 @@ Utility scripts are provided in `bin/`:
   to execute pending `storage_up`/`storage_down` tasks and purge old events. Use
   `-v` for verbose output.
 
+Add crontab : 
+
+```*/5 * * * * /directory/wakeonstorage/bin/cron
+
 ## Post-up redirection override
 
 You can override the URL displayed after the storage is started by providing a
