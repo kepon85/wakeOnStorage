@@ -19,7 +19,15 @@ router:
   router_up:
     - "09:00"
     - "12:00"
-energy: solar-stric
+energy:
+  mode: solar-stric
+  interface_print:
+    production_solaire_estimation: true
+    batterie: false
+    production_solaire: true
+  correction:
+    production_solaire: -30
+    production_solaire_estimation: -30
 ajax:
   refresh: 10
   router_refresh: 10

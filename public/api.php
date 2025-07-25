@@ -56,6 +56,7 @@ if (!file_exists($file)) {
     $file = "$configDir/default.yml";
 }
 $cfg = Yaml::parseFile($file);
+$energyCorrection = $cfg['energy']['correction'] ?? [];
 
 $dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
 $dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
@@ -268,6 +269,11 @@ if ($now - $solarSince >= $solarRefresh && !empty($global['data']['production_so
         return http_get_json($cfgSolar['url'], $headers);
     }, $ttl, $debugEnabled, $debugLog, 'PROD_SOL');
     $value = $data['state'] ?? null;
+    if ($value !== null) {
+        $value = (int)round($value);
+        $value += (int)($energyCorrection['production_solaire'] ?? 0);
+        if ($value < 0) $value = 0;
+    }
     $result['production_solaire'] = ['value' => ($value !== null ? $value : 'NA')];
     $result['solar_timestamp'] = $now;
 }
@@ -285,38 +291,29 @@ if ($now - $forecastSince >= $forecastRefresh && !empty($global['data']['product
     $forecast = [];
     if ($raw && !empty($raw['forecasts'])) {
         $nowTs = time();
-        $start = null;
+        $hourly = [];
+        $firstHour = null;
         foreach ($raw['forecasts'] as $f) {
             $ts = strtotime($f['period_end'] ?? '');
-            $val = $f['pv_estimate'] ?? 0;
-            if ($ts === false) continue;
-            if ($start === null) {
-                if ($ts >= $nowTs && $val > 0) {
-                    $start = true;
-                } else {
-                    continue;
-                }
-            }
-            if ($start && $val <= 0 && $ts > $nowTs) {
-                break;
-            }
-            if ($start) {
-                if ($ts >= $nowTs) {
-                    $forecast[] = ['period_end' => $f['period_end'], 'pv_estimate' => $val];
-                }
-            }
+            if ($ts === false || $ts < $nowTs) continue;
+            $val = (int)round(($f['pv_estimate'] ?? 0) * 1000); // convert kW to W
+            $hourTs = (int)($ts / 3600) * 3600;
+            if ($firstHour === null || $hourTs < $firstHour) $firstHour = $hourTs;
+            if (!isset($hourly[$hourTs])) $hourly[$hourTs] = 0;
+            $hourly[$hourTs] += $val;
         }
-        if (!$forecast) {
-            $start = false;
-            foreach ($raw['forecasts'] as $f) {
-                $ts = strtotime($f['period_end'] ?? '');
-                $val = $f['pv_estimate'] ?? 0;
-                if ($ts === false) continue;
-                if (!$start && $val > 0) { $start = true; }
-                if ($start) {
-                    $forecast[] = ['period_end' => $f['period_end'], 'pv_estimate' => $val];
-                    if ($val <= 0 && count($forecast) > 1) break;
-                }
+        if ($hourly) {
+            ksort($hourly);
+            $firstHour = array_key_first($hourly);
+            $midnight = strtotime('tomorrow midnight', $nowTs);
+            for ($h = $firstHour; $h <= $midnight; $h += 3600) {
+                if (!isset($hourly[$h])) $hourly[$h] = 0;
+            }
+            ksort($hourly);
+            foreach ($hourly as $h => $v) {
+                $v += (int)($energyCorrection['production_solaire_estimation'] ?? 0);
+                if ($v < 0) $v = 0;
+                $forecast[] = ['period_end' => date('c', $h), 'pv_estimate' => $v];
             }
         }
     }

@@ -1,1 +1,5 @@
 body { background-color: #f7f7f7; }
+#energy-info div { font-size: 0.9rem; }
+#solar-forecast { overflow: hidden; white-space: nowrap; }
+#solar-forecast .forecast-item { min-width: 70px; }
+#solar-forecast .forecast-toggle { cursor: pointer; }

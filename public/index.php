@@ -299,6 +299,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
   <div id="down-info" class="alert alert-warning d-none mb-3">
     Le storage va s'arrêter dans <span id="down-time">--</span>.
   </div>
+  <div id="energy-info" class="row mb-3">
+    <div id="battery-info" class="col-auto mb-2 d-none"></div>
+    <div id="solar-production" class="col-auto mb-2 d-none"></div>
+    <div id="solar-forecast" class="col mb-2 d-none"></div>
+  </div>
   <div id="storage-content" class="mb-3"></div>
   <div id="loading" style="" class="position-fixed top-0 bottom-0 start-0 end-0 bg-white bg-opacity-50 d-flex flex-column justify-content-center align-items-center" style="z-index:1060;">
     <img src="./img/load.svg" alt="loading" class="mb-3" style="max-width:175px;">
@@ -325,6 +330,8 @@ var lastStorageStatus = null;
 var storagePostUpShown = false;
 var storagePostDownShown = false;
 var firstUpdate = true;
+var energyPrint = <?php echo json_encode($cfg['energy']['interface_print'] ?? []); ?>;
+var storageConso = <?php echo (int)($cfg['storage']['conso'] ?? 0); ?>;
 
 function showPostUp() {
   if (!storagePostUp || storagePostUpShown) return;
@@ -424,6 +431,56 @@ function updateDownCountdown() {
 setInterval(updateCountdown, 60000);
 setInterval(updateDownCountdown, 60000);
 
+function displayEnergy(data) {
+  if (energyPrint.batterie && data.batterie) {
+    $('#battery-info').removeClass('d-none')
+      .text('Batterie: ' + data.batterie[0].value + '%');
+  }
+  if (energyPrint.production_solaire && data.production_solaire) {
+    var prod = Math.round(data.production_solaire.value);
+    var prodElem = $('#solar-production').removeClass('d-none');
+    prodElem.text('Production: ' + prod + ' W');
+    if (prod > storageConso) {
+      prodElem.removeClass('text-danger').addClass('text-success');
+    } else {
+      prodElem.removeClass('text-success').addClass('text-danger');
+    }
+  }
+  if (energyPrint.production_solaire_estimation && data.production_solaire_estimation) {
+    var cont = $('#solar-forecast').empty();
+    var arr = data.production_solaire_estimation.values || [];
+    if (arr.length) {
+      var limit = 8;
+      var collapsed = $('<span class="forecast-collapsed">').appendTo(cont);
+      var more = $('<span class="forecast-more d-none">').appendTo(cont);
+      arr.forEach(function(f, i){
+        var t = new Date(f.period_end);
+        var time = t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        var icon = f.pv_estimate > 0 ? '☀️' : '☁️';
+        var item = $('<div class="d-inline-block text-center me-2 forecast-item">')
+          .append($('<div>').text(time))
+          .append($('<div>').text(icon + ' ' + Math.round(f.pv_estimate) + ' W'));
+        if (f.pv_estimate > storageConso) {
+          item.addClass('text-success');
+        } else {
+          item.addClass('text-danger');
+        }
+        if (i < limit) item.appendTo(collapsed); else item.appendTo(more);
+      });
+      if (more.children().length) {
+        var toggle = $('<span class="ms-2 forecast-toggle">➕</span>').appendTo(cont);
+        toggle.on('click', function(){
+          more.toggleClass('d-none');
+          $(this).text(more.hasClass('d-none') ? '➕' : '➖');
+        });
+      }
+      cont.removeClass('d-none');
+    } else {
+      cont.addClass('d-none');
+    }
+  }
+}
+
 function updateAll() {
   if (firstUpdate) {
     $('#loading-text').text('Requête sur le serveur en cours...');
@@ -522,9 +579,7 @@ function updateAll() {
             lastStorageStatus = data.storage.status;
         }
     }
-    if (data.batterie) console.log('batterie', data.batterie);
-    if (data.production_solaire) console.log('prod', data.production_solaire);
-    if (data.production_solaire_estimation) console.log('forecast', data.production_solaire_estimation);
+    displayEnergy(data);
     if (data.debug) console.debug('api debug', data.debug);
   }).always(function() {
     if (firstUpdate) {
