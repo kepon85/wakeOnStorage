@@ -85,6 +85,23 @@ Set `debug: true` in `global.yml` to include verbose logs about API calls in the
 JSON responses returned by `api.php`. When enabled, storage actions (`storage_up`
 and `storage_down`) also return the full request and response details.
 
+### Energy modes
+
+Each interface can specify energy constraints under the `energy` section. The
+`mode` field controls how the interface reacts to solar production forecasts:
+
+- `solar-strict` – the storage can only be powered on when the forecasted solar
+  production is above the storage consumption. Available durations are limited
+  to the number of hours with sufficient sunlight.
+- `solar` – solar energy is preferred. Durations that can be fully covered by
+  the forecast are marked "Avec l'énergie solaire" in the selector but remain
+  available at any time.
+- `all` – no energy restrictions are applied.
+- `solar-batterie` – similar to `solar` but falls back to battery power. A
+  `batterie` block allows configuring the battery `id` and the minimum state of
+  charge (`soc_mini`) required to start the storage.
+An information banner at the bottom of the interface describes the active mode and its consequences for powering on the storage.
+
 ## Data sources
 
 `public/api.php` exposes various data points used by the interfaces. Each source

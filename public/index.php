@@ -304,6 +304,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
     <div id="solar-production" class="col-auto mb-2 d-none"></div>
     <div id="solar-forecast" class="col mb-2 d-none"></div>
   </div>
+  <div id="energy-mode-msg" class="alert alert-info mb-3"></div>
   <div id="storage-content" class="mb-3"></div>
   <div id="loading" style="" class="position-fixed top-0 bottom-0 start-0 end-0 bg-white bg-opacity-50 d-flex flex-column justify-content-center align-items-center" style="z-index:1060;">
     <img src="./img/load.svg" alt="loading" class="mb-3" style="max-width:175px;">
@@ -324,6 +325,9 @@ var batterySince = 0;
 var solarSince = 0;
 var forecastSince = 0;
 var storageSince = 0;
+var lastBattery = null;
+var lastSolar = null;
+var lastForecast = null;
 var storagePostUp = <?php echo json_encode($cfg['storage']['up']['post'] ?? null); ?>;
 var storagePostDown = <?php echo json_encode($cfg['storage']['down']['post'] ?? null); ?>;
 var lastStorageStatus = null;
@@ -332,6 +336,9 @@ var storagePostDownShown = false;
 var firstUpdate = true;
 var energyPrint = <?php echo json_encode($cfg['energy']['interface_print'] ?? []); ?>;
 var storageConso = <?php echo (int)($cfg['storage']['conso'] ?? 0); ?>;
+var energyMode = <?php echo json_encode($cfg['energy']['mode'] ?? 'all'); ?>;
+var batteryCfg = <?php echo json_encode($cfg['energy']['batterie'] ?? []); ?>;
+var wakeTimesJs = <?php echo json_encode($wakeTimes); ?>;
 
 function showPostUp() {
   if (!storagePostUp || storagePostUpShown) return;
@@ -432,12 +439,16 @@ setInterval(updateCountdown, 60000);
 setInterval(updateDownCountdown, 60000);
 
 function displayEnergy(data) {
-  if (energyPrint.batterie && data.batterie) {
+  if (data.batterie) lastBattery = data.batterie;
+  if (data.production_solaire) lastSolar = data.production_solaire;
+  if (data.production_solaire_estimation) lastForecast = data.production_solaire_estimation;
+
+  if (energyPrint.batterie && lastBattery) {
     $('#battery-info').removeClass('d-none')
-      .text('Batterie: ' + data.batterie[0].value + '%');
+      .text('Batterie: ' + lastBattery[0].value + '%');
   }
-  if (energyPrint.production_solaire && data.production_solaire) {
-    var prod = Math.round(data.production_solaire.value);
+  if (energyPrint.production_solaire && lastSolar) {
+    var prod = Math.round(lastSolar.value);
     var prodElem = $('#solar-production').removeClass('d-none');
     prodElem.text('Production: ' + prod + ' W');
     if (prod > storageConso) {
@@ -446,9 +457,9 @@ function displayEnergy(data) {
       prodElem.removeClass('text-success').addClass('text-danger');
     }
   }
-  if (energyPrint.production_solaire_estimation && data.production_solaire_estimation) {
+  if (energyPrint.production_solaire_estimation && lastForecast) {
     var cont = $('#solar-forecast').empty();
-    var arr = data.production_solaire_estimation.values || [];
+    var arr = lastForecast.values || [];
     if (arr.length) {
       var limit = 8;
       var collapsed = $('<span class="forecast-collapsed">').appendTo(cont);
@@ -478,6 +489,87 @@ function displayEnergy(data) {
     } else {
       cont.addClass('d-none');
     }
+  }
+}
+
+function computeSolarHours(forecast) {
+  if (!Array.isArray(forecast)) return 0;
+  var now = new Date();
+  var h = 0;
+  for (var i = 0; i < forecast.length; i++) {
+    var f = forecast[i];
+    var t = new Date(f.period_end);
+    if (t <= now) continue;
+    if (f.pv_estimate >= storageConso) h++; else break;
+  }
+  return h;
+}
+
+function updateEnergyModeMsg() {
+  var txt = '';
+  switch (energyMode) {
+    case 'solar-strict':
+      txt = "Mode solaire strict : ce stockage n'utilise que l'énergie solaire. L'allumage n'est possible que pendant les heures de production suffisantes.";
+      break;
+    case 'solar':
+      txt = "Mode solaire pr\xE9f\xE9rentiel : les plages en vert fonctionnent avec l'\xE9nergie solaire.";
+      break;
+    case 'solar-batterie':
+      txt = "Mode solaire + batterie : les plages en vert utilisent l'\xE9nergie solaire, les autres la batterie.";
+      if (batteryCfg && batteryCfg.soc_mini) {
+        txt += ' Allumage impossible si la batterie est sous ' + batteryCfg.soc_mini + '%.';
+      }
+      break;
+    default:
+      txt = "Aucune contrainte \xE9nerg\xE9tique : le stockage peut \xEAtre allum\xE9 \xE0 tout moment.";
+  }
+  $('#energy-mode-msg').text(txt);
+}
+
+function applyEnergyRules(data) {
+  var forecast = lastForecast ? lastForecast.values || [] : [];
+  var solarHours = computeSolarHours(forecast);
+
+  var opts = $('#on-duration option, #router-plan select[name="router_end"] option');
+  opts.each(function(){
+    var dur = parseFloat($(this).val());
+    if (isNaN(dur)) return;
+    var solar = dur <= solarHours;
+    var label = dur + 'h';
+    if (energyMode === 'solar') {
+      if (solar) label += ' - Avec l\'énergie solaire';
+      $(this).toggleClass('text-success', solar)
+             .toggleClass('text-warning', !solar);
+    } else if (energyMode === 'solar-batterie') {
+      label += solar ? ' - Avec l\'énergie solaire' : ' - Batterie';
+      $(this).toggleClass('text-success', solar)
+             .toggleClass('text-warning', !solar);
+    } else {
+      $(this).removeClass('text-success text-warning');
+    }
+    $(this).text(label);
+    if (energyMode === 'solar-strict') {
+      $(this).prop('disabled', !solar);
+    } else {
+      $(this).prop('disabled', false);
+    }
+  });
+
+  var selected = $('#on-duration option:selected');
+  var disable = false;
+  if (energyMode === 'solar-strict') {
+    if (solarHours <= 0 || selected.prop('disabled')) disable = true;
+  }
+  if (energyMode === 'solar-batterie') {
+    var idx = parseInt(batteryCfg.id || 0);
+    var socMin = parseFloat(batteryCfg.soc_mini || batteryCfg.soc_min || 0);
+    if (lastBattery && lastBattery[idx]) {
+      var val = parseFloat(lastBattery[idx].value);
+      if (!isNaN(val) && socMin > 0 && val < socMin) disable = true;
+    }
+  }
+  if (disable) {
+    $('#btn-on').prop('disabled', true);
   }
 }
 
@@ -580,6 +672,7 @@ function updateAll() {
         }
     }
     displayEnergy(data);
+    applyEnergyRules(data);
     if (data.debug) console.debug('api debug', data.debug);
   }).always(function() {
     if (firstUpdate) {
@@ -590,6 +683,7 @@ function updateAll() {
   });
 }
 $(updateAll);
+updateEnergyModeMsg();
 
 function doStorageAction(act, extra) {
   $('#loading-text').text('Action demandée, merci de patienter...');

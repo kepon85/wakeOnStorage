@@ -21,6 +21,9 @@ router:
     - "12:00"
 energy:
   mode: solar-stric
+  batterie:
+    id: 0
+    soc_mini: 30
   interface_print:
     production_solaire_estimation: true
     batterie: false
