@@ -37,7 +37,7 @@ if ($maintenanceActive) {
 <?php if (!empty($cfg['interface']['logo'])): ?>
 <img src="<?= htmlspecialchars($cfg['interface']['logo']) ?>" alt="logo" class="mb-4" style="max-height:150px;">
 <?php endif; ?>
-<?= $maintenanceMessage ?: '<p>En maintenance...</p>' ?>
+<?= $maintenanceMessage ?: '<p>En maintenance…</p>' ?>
 </body>
 </html>
 <?php
@@ -259,7 +259,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
         $body = "Utilisateur $authenticatedUser a demande l'allumage du routeur sur $host jusqu'a $end.";
         Mailer::send($global['mail'] ?? [], $global['contact_admin']['name'] ?? 'Admin', $to, $to, $subject, $body);
     }
-    $message = 'Planification envoy\xC3\xA9e';
+    $message = 'Planification envoyée';
 }
 ?>
 <!DOCTYPE html>
@@ -293,7 +293,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
         </div>
       </div>
       <div class="col-lg-6 col-xl-6 mt-3 mt-lg-0 d-flex flex-column align-items-center align-items-lg-end justify-content-center" id="action">
-        <div id="eteindre-msg p-3"></div>
+        <div id="eteindre-msg"  class="p-1 text-end"></div>
         <div id="prolong-msg" class="p-1 text-end"></div>
         <div id="router-actions" class="mb-3 d-flex flex-column flex-lg-row align-items-center align-items-lg-end justify-content-center justify-content-lg-end gap-2 w-100" style="max-width:400px;">
           <div class="btn btn-tertiary border border-secondary rounded d-flex align-items-center justify-content-center flex-shrink-0 align-self-stretch" >
@@ -310,7 +310,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
               <?php endforeach; ?>
             </select>
           </div>
-          <button id="btn-off" class="btn btn-danger border border-danger border-3 mb-2 mb-lg-0 w-100">Eteindre</button>
+          <button id="btn-off" class="btn btn-danger border border-danger border-3 mb-2 mb-lg-0 w-100">Éteindre</button>
         </div>
       </div>
     </div>
@@ -340,20 +340,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
             <option value="<?= htmlspecialchars($opt['value']) ?>"><?= htmlspecialchars($opt['label']) ?></option>
             <?php endforeach; ?>
           </select>
-          <label class="form-label">Durée d'allumage</label>
+          <label class="form-label">Durée d’allumage</label>
           <select name="router_end" class="form-select">
             <?php foreach ($wakeTimes as $t): ?>
             <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?>h</option>
             <?php endforeach; ?>
           </select>
           <div class="mb-3 w-100">
-            <label class="form-label">E-mail de notification quand allumé (optionnel)</label>
+            <label class="form-label">E-mail de notification à l’allumage (optionnel)</label>
             <input type="email" name="notify_email" class="form-control">
           </div>
         </div>
       </div>
       <div class="d-flex flex-column flex-lg-row gap-2 w-100">
-        <button type="submit" id="schedule_router" name="schedule_router" class="btn btn-primary w-100">Planifier l'allumage</button>
+        <button type="submit" id="schedule_router" name="schedule_router" class="btn btn-primary w-100">Planifier l’allumage</button>
         <button type="button" id="cancel-start" class="btn btn-danger w-100 d-none">Annuler la demande</button>
       </div>
     </form>
@@ -368,7 +368,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
   <div id="energy-mode-msg" class="alert alert-info mb-3"></div>
   <div id="loading" style="" class="position-fixed top-0 bottom-0 start-0 end-0 bg-white bg-opacity-50 d-flex flex-column justify-content-center align-items-center" style="z-index:1060;">
     <img src="./img/load.svg" alt="loading" class="mb-3" style="max-width:175px;">
-    <p id="loading-text" class="h5 mb-0">Requête sur le serveur en cours...</p>
+    <p id="loading-text" class="h5 mb-0">Requête sur le serveur en cours…</p>
   </div>
 
 </div>
@@ -591,16 +591,16 @@ function updateEnergyModeMsg() {
       txt = "Mode solaire strict : ce stockage n'utilise que l'énergie solaire. L'allumage n'est possible que pendant les heures de production suffisantes.";
       break;
     case 'solar':
-      txt = "Mode solaire pr\xE9f\xE9rentiel : les plages en vert fonctionnent avec l'\xE9nergie solaire.";
+      txt = "Mode solaire préférentiel : les plages en vert fonctionnent avec l'énergie solaire.";
       break;
     case 'solar-batterie':
-      txt = "Mode solaire + batterie : les plages en vert utilisent l'\xE9nergie solaire, les autres la batterie.";
+      txt = "Mode solaire + batterie : les plages en vert utilisent l'énergie solaire, les autres la batterie.";
       if (batteryCfg && batteryCfg.soc_mini) {
         txt += ' Allumage impossible si la batterie est sous ' + batteryCfg.soc_mini + '%.';
       }
       break;
     default:
-      txt = "Aucune contrainte \xE9nerg\xE9tique : le stockage peut \xEAtre allum\xE9 \xE0 tout moment.";
+      txt = "Aucune contrainte énergétique : le stockage peut être allumé à tout moment.";
   }
   $('#energy-mode-msg').text(txt);
 }
@@ -654,7 +654,7 @@ function applyEnergyRules(data) {
 
 function updateAll() {
   if (firstUpdate) {
-    $('#loading-text').text('Requête sur le serveur en cours...');
+    $('#loading-text').text('Requête sur le serveur en cours…');
     $('#loading').removeClass('d-none');
   }
   $.getJSON('api.php', {
@@ -734,14 +734,14 @@ function updateAll() {
                 var minutes = Math.floor(diff / 60000);
                 var hours = Math.floor(minutes / 60);
                 minutes = minutes % 60;
-                statusMsg = "Le stockage est allumé, il devrait s'arrêter dans " + hours + " heure(s), " + minutes + " minute(s).";
+                statusMsg = "Le stockage est allumé, il s’arrêtera dans " + hours + " heure(s) et " + minutes + " minute(s).";
             } else {
                 statusMsg = "Le stockage est allumé.";
             }
             $('#prolong-msg').text(statusMsg).removeClass('d-none');
             $('#eteindre-msg').addClass('d-none');
         } else if (data.storage.status === 'down') {
-            statusMsg = "Le stockage est actuellement éteint";
+            statusMsg = "Le stockage est actuellement éteint. Vous pouvez l’allumer.";
             $('#eteindre-msg').text(statusMsg).removeClass('d-none');
             $('#prolong-msg').addClass('d-none');
         } else {
@@ -798,11 +798,11 @@ function updateAll() {
             } else {
                 var elapsed = Date.now() - waitStatus.start;
                 if (waitStatus.timeout > 0 && elapsed > waitStatus.timeout) {
-                    $('#loading-text').text("Le délai est dépassé, désolé veuillez contacter l'administrateur, un problème est certainement survenu");
+                    $('#loading-text').text("Le délai est dépassé. Désolé, veuillez contacter l’administrateur, un problème est certainement survenu.");
                     setTimeout(function(){ $('#loading').addClass('d-none'); }, 5000);
                     waitStatus = null;
                 } else if (waitStatus.time > 0 && elapsed > waitStatus.time) {
-                    $('#loading-text').text("C'est un peu long mais ça peut encore venir");
+                    $('#loading-text').text("C’est un peu long, mais ça peut encore venir.");
                 }
             }
         }
@@ -830,10 +830,10 @@ function doStorageAction(act, extra) {
   }
   $.post('api.php', data, function(res) {
     if (res && res.success) {
-      var msg = 'Action effectu\xE9e';
-      if (act === 'storage_up') msg = 'Allumage demand\xE9';
-      else if (act === 'storage_down') msg = 'Extinction demand\xE9e';
-      else if (act === 'extend_up') msg = 'Prolongation demand\xE9e';
+      var msg = 'Action effectuée.';
+      if (act === 'storage_up') msg = 'Allumage demandé.';
+      else if (act === 'storage_down') msg = 'Extinction demandée.';
+      else if (act === 'extend_up') msg = 'Prolongation demandée.';
       notify('info', msg);
       storageSince = 0; // force refresh
       if (act === 'storage_up' || act === 'storage_down') {
@@ -845,7 +845,7 @@ function doStorageAction(act, extra) {
           time: t * 1000,
           timeout: to * 1000
         };
-        var txt = act === 'storage_up' ? 'Allumage demand\xE9... patience' : 'Extinction demand\xE9e... patience';
+        var txt = act === 'storage_up' ? 'Allumage demandé... patience' : 'Extinction demandée... patience';
         $('#loading-text').text(txt);
         $('#loading').removeClass('d-none');
         updateAll();
@@ -854,7 +854,7 @@ function doStorageAction(act, extra) {
     } else {
       if (act === 'storage_down' && res.reason === 'not_owner') {
         var when = res.scheduled_down ? new Date(res.scheduled_down * 1000) : null;
-        var txt = "Impossible d'\xE9teindre : arrêt programm\xE9 pour ";
+        var txt = "Impossible d’éteindre : arrêt déjà programmé par un autre utilisateur.";
         if (when) {
           txt += when.toLocaleString();
         } else {
@@ -865,10 +865,10 @@ function doStorageAction(act, extra) {
         var cnt = res.count || 0;
         var msg = cnt + ' connexion';
         if (cnt > 1) msg += 's';
-        msg += " en cours sur ce storage, il ne peut \xEAtre \xE9teint, veuillez r\xE9essayer ult\xE9rieurement";
+        msg += " en cours sur ce stockage, il ne peut pas être éteint, veuillez réessayer ultérieurement.";
         notify('warn', msg, 5000);
       } else {
-        notify('warn', 'Erreur lors de l\'action');
+        notify('warn', 'Erreur lors de l’action.');
       }
     }
   }, 'json').always(function(){
