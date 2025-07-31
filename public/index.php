@@ -266,52 +266,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
 <html>
 <head>
 <meta charset="utf-8">
-<title><?= htmlspecialchars($cfg['interface']['name'] ?? 'WakeOnStorage') ?></title>
+<title><?= htmlspecialchars($cfg['interface']['title'] ?? 'WakeOnStorage') ?></title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="app.css">
 <?php if (!empty($cfg['interface']['css'])): foreach ($cfg['interface']['css'] as $css): ?>
 <link rel="stylesheet" href="<?= htmlspecialchars($css) ?>">
 <?php endforeach; endif; ?>
-<style>
-#solar-forecast {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow-x: auto;
-  white-space: nowrap;
-  display: block;
-}
-</style>
 </head>
 <body>
 <div class="container mt-4">
   <header class="mb-3">
     <div class="row align-items-center">
-      <div class="col-lg-7 col-xl-7 d-flex align-items-center mb-3 mb-lg-0 flex-column flex-lg-row text-center text-lg-start">
+      <div class="col-lg-6 col-xl-6 d-flex align-items-center mb-3 mb-lg-0 flex-column flex-lg-row text-center text-lg-start">
         <?php if (!empty($cfg['interface']['logo'])): ?>
-          <img src="<?= htmlspecialchars($cfg['interface']['logo']) ?>" alt="logo" height="64" class="me-lg-3 mb-2 mb-lg-0 mx-auto mx-lg-0">
+          <img src="<?= htmlspecialchars($cfg['interface']['logo']) ?>" alt="logo" height="94" class="me-lg-3 mb-2 mb-lg-0 mx-auto mx-lg-0">
         <?php endif; ?>
         <div class="flex-grow-1">
-          <h1 class="h4 mb-2 mb-lg-1"><?= htmlspecialchars($cfg['interface']['name'] ?? '') ?></h1>
+          <h1 class="h4 mb-2 mb-lg-1"><?= htmlspecialchars($cfg['interface']['title'] ?? '') ?></h1>
+          <?php if (!empty($cfg['interface']['subTitle'])): ?>
+            <p class="mb-2 mb-lg-1"><?= htmlspecialchars($cfg['interface']['subTitle'] ?? '') ?></p>
+          <?php endif; ?>
           <div id="energy-info" class="row justify-content-center justify-content-lg-start mb-0">
             <div id="battery-info" class="col-auto mb-2 d-none"></div>
             <div id="solar-production" class="col-auto mb-2 d-none"></div>
           </div>
         </div>
       </div>
-      <div class="col-lg-5 col-xl-5 mt-3 mt-lg-0 d-flex flex-column align-items-center align-items-lg-end justify-content-center" id="action">
-        <div id="eteindre-msg"></div>
-        <div id="prolong-msg"></div>
+      <div class="col-lg-6 col-xl-6 mt-3 mt-lg-0 d-flex flex-column align-items-center align-items-lg-end justify-content-center" id="action">
+        <div id="eteindre-msg p-3"></div>
+        <div id="prolong-msg" class="p-1 text-end"></div>
         <div id="router-actions" class="mb-3 d-flex flex-column flex-lg-row align-items-center align-items-lg-end justify-content-center justify-content-lg-end gap-2 w-100" style="max-width:400px;">
+          <div class="btn btn-tertiary border border-secondary rounded d-flex align-items-center justify-content-center flex-shrink-0 align-self-stretch" >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="24" height="24" style="display:block;">
+              <path id="storage-status-path" fill="none" stroke="#6c757d" stroke-width="32" d="M352 64C352 46.3 337.7 32 320 32C302.3 32 288 46.3 288 64L288 320C288 337.7 302.3 352 320 352C337.7 352 352 337.7 352 320L352 64zM210.3 162.4C224.8 152.3 228.3 132.3 218.2 117.8C208.1 103.3 188.1 99.8 173.6 109.9C107.4 156.1 64 233 64 320C64 461.4 178.6 576 320 576C461.4 576 576 461.4 576 320C576 233 532.6 156.1 466.3 109.9C451.8 99.8 431.9 103.3 421.7 117.8C411.5 132.3 415.1 152.2 429.6 162.4C479.4 197.2 511.9 254.8 511.9 320C511.9 426 425.9 512 319.9 512C213.9 512 128 426 128 320C128 254.8 160.5 197.1 210.3 162.4z"/>
+            </svg>
+          </div>
           <div id="on-extend-and-on-with-durantion" class="input-group mb-2 mb-lg-0 w-100" style="min-width:200px;">
             <button id="btn-extend" class="btn btn-primary d-none" type="button">Prolonger</button>
-            <select id="on-duration" class="border border-primary form-select" style="min-width:90px;">
+            <button id="btn-on" class="btn btn-success d-none">Allumer</button>
+            <select id="on-duration" class="border border-3 form-select" style="min-width:90px;">
               <?php foreach ($wakeTimes as $t): ?>
               <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?>h</option>
               <?php endforeach; ?>
             </select>
-            <button id="btn-on" class="btn btn-success d-none">Allumer</button>
           </div>
-          <button id="btn-off" class="btn btn-danger mb-2 mb-lg-0 w-100">Eteindre</button>
+          <button id="btn-off" class="btn btn-danger border border-danger border-3 mb-2 mb-lg-0 w-100">Eteindre</button>
         </div>
       </div>
     </div>
@@ -320,17 +319,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
   <div class="alert alert-warning text-center mb-3"><?php echo $maintenanceBanner; ?></div>
   <?php endif; ?>
   
-  <div class="d-flex align-items-center mb-3">
-    <div class="border border-secondary rounded d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width:75px; height:75px; min-width:75px; min-height:75px;">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="44" height="44" style="display:block;">
-        <path id="storage-status-path" fill="none" stroke="#6c757d" stroke-width="32" d="M352 64C352 46.3 337.7 32 320 32C302.3 32 288 46.3 288 64L288 320C288 337.7 302.3 352 320 352C337.7 352 352 337.7 352 320L352 64zM210.3 162.4C224.8 152.3 228.3 132.3 218.2 117.8C208.1 103.3 188.1 99.8 173.6 109.9C107.4 156.1 64 233 64 320C64 461.4 178.6 576 320 576C461.4 576 576 461.4 576 320C576 233 532.6 156.1 466.3 109.9C451.8 99.8 431.9 103.3 421.7 117.8C411.5 132.3 415.1 152.2 429.6 162.4C479.4 197.2 511.9 254.8 511.9 320C511.9 426 425.9 512 319.9 512C213.9 512 128 426 128 320C128 254.8 160.5 197.1 210.3 162.4z"/>
-      </svg>
-    </div>
-    <div class="flex-grow-1 d-flex flex-column">
-      <div id="solar-forecast" class="mb-2"></div>
-    </div>
-  </div>
-
   <div id="notifications" class="position-fixed top-0 end-0 p-3" style="z-index:1051;"></div>
   <?php if ($message): ?>
   <script>var initialMessage = <?= json_encode($message) ?>;</script>
@@ -342,33 +330,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
   <div class="d-flex justify-content-center">
     <form id="router-plan" method="post" class="mb-3 w-100 d-flex flex-column align-items-center" style="max-width:400px;">
       <div class="mb-3 w-100">
-        <h4 id="router-msg" class="text-center">Le storage ne peut être allumé pour le moment.</h4>
-        <label class="form-label">Allumage</label>
-        <select name="router_start" class="form-select mb-2">
-          <option value="asap">Dès que possible</option>
-          <?php foreach ($routerUpOptions as $opt): ?>
-          <option value="<?= htmlspecialchars($opt['value']) ?>"><?= htmlspecialchars($opt['label']) ?></option>
-          <?php endforeach; ?>
-        </select>
-        <label class="form-label">Durée d'allumage</label>
-        <select name="router_end" class="form-select">
-          <?php foreach ($wakeTimes as $t): ?>
-          <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?>h</option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div class="mb-3 w-100">
-        <label class="form-label">E-mail de notification (optionnel)</label>
-        <input type="email" name="notify_email" class="form-control">
+        <h4 class="text-center">Le storage ne peut être allumé pour le moment.</h4>
+        <p id="router-msg" class="text-center"></p>
+        <div id="schedule-form">
+          <label class="form-label">Allumage</label>
+          <select name="router_start" class="form-select mb-2">
+            <option value="asap">Dès que possible</option>
+            <?php foreach ($routerUpOptions as $opt): ?>
+            <option value="<?= htmlspecialchars($opt['value']) ?>"><?= htmlspecialchars($opt['label']) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <label class="form-label">Durée d'allumage</label>
+          <select name="router_end" class="form-select">
+            <?php foreach ($wakeTimes as $t): ?>
+            <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?>h</option>
+            <?php endforeach; ?>
+          </select>
+          <div class="mb-3 w-100">
+            <label class="form-label">E-mail de notification quand allumé (optionnel)</label>
+            <input type="email" name="notify_email" class="form-control">
+          </div>
+        </div>
       </div>
       <div class="d-flex flex-column flex-lg-row gap-2 w-100">
-        <button type="submit" name="schedule_router" class="btn btn-primary w-100">Planifier l'allumage</button>
+        <button type="submit" id="schedule_router" name="schedule_router" class="btn btn-primary w-100">Planifier l'allumage</button>
         <button type="button" id="cancel-start" class="btn btn-danger w-100 d-none">Annuler la demande</button>
       </div>
     </form>
   </div>
 
   <div id="storage-content" class="mb-3"></div>
+  <div class="d-flex align-items-center mb-3">
+    <div class="flex-grow-1 d-flex flex-column">
+      <div id="solar-forecast" class="mb-2"></div>
+    </div>
+  </div>
   <div id="energy-mode-msg" class="alert alert-info mb-3"></div>
   <div id="loading" style="" class="position-fixed top-0 bottom-0 start-0 end-0 bg-white bg-opacity-50 d-flex flex-column justify-content-center align-items-center" style="z-index:1060;">
     <img src="./img/load.svg" alt="loading" class="mb-3" style="max-width:175px;">
@@ -421,7 +417,7 @@ function showPostUp() {
   cont.empty();
   if (storagePostUp.methode === 'redirect-iframe' && storagePostUp.page) {
     var ifr = $('<iframe>').attr('src', storagePostUp.page)
-      .addClass('w-100').css('height', '600px').attr('frameborder', '0');
+      .addClass('border border-secondary border-opacity-50 rounded-4 border-4 w-100').css('height', '600px').attr('frameborder', '0');
     cont.append(ifr);
   } else if (storagePostUp.methode === 'text' && storagePostUp.content) {
     cont.html(storagePostUp.content);
@@ -448,14 +444,14 @@ function showPostDown() {
     var wrapper = $('<div>')
       .addClass('d-flex justify-content-center align-items-center bg-dark text-white')
       .css({
-        'min-height': '200px',
+        'min-height': '100px',
         'width': '100%',
         'border-radius': '12px'
       });
-    // Responsive : 500x500 sur grand écran, auto sur petit
+    // Responsive : sur grand écran, auto sur petit
     wrapper.css({
-      'max-width': '500px',
-      'max-height': '500px',
+      'max-width': '70%',
+      'max-height': '200px',
       'margin': '0 auto'
     });
     // Utiliser une div interne pour le contenu
@@ -513,13 +509,11 @@ function updateCountdown() {
   var hours = Math.floor(minutes / 60);
   minutes = minutes % 60;
   $('#router-msg').text(
-    'Le storage ne peut être allumé pour le moment, il le sera d\'ici ' +
+    'Il le sera d\'ici ' +
     hours + ' heure(s) et ' + minutes +
     ' minute(s), vous pouvez planifier un allumage : '
   );
 }
-
-setInterval(updateCountdown, 60000);
 
 function displayEnergy(data) {
   if (data.batterie) lastBattery = data.batterie;
@@ -688,13 +682,18 @@ function updateAll() {
         }
         if (!routerNote) routerNote = notify('warn', msg, 0); else routerNote.text(msg);
         if (data.router.pending_start) {
-          plan.find('button[name="schedule_router"]').prop('disabled', true);
+          $('#schedule_router').prop('disabled', true);
           $('#cancel-start').removeClass('d-none');
-          $('#router-msg').text('Une demande d\'allumage est en attente.');
+          $('#schedule_router').addClass('d-none');
+          $('#schedule-form').addClass('d-none');
+          $('#router-msg').html('<b>Une demande d\'allumage est déjà en attente</b>.');
         } else {
-          plan.find('button[name="schedule_router"]').prop('disabled', false);
+          $('#schedule_router').prop('disabled', false);
           $('#cancel-start').addClass('d-none');
-          $('#router-msg').text('Le storage ne peut être allumé pour le moment.');
+          $('#schedule_router').removeClass('d-none');
+          $('#schedule-form').removeClass('d-none');
+          $('#router-msg').text('Le stockage ne peut être allumé pour le moment.');
+          updateCountdown();
         }
         plan.removeClass('d-none');
         actions.addClass('d-none');
@@ -742,7 +741,7 @@ function updateAll() {
             $('#prolong-msg').text(statusMsg).removeClass('d-none');
             $('#eteindre-msg').addClass('d-none');
         } else if (data.storage.status === 'down') {
-            statusMsg = "Le stockage est actuellement éteint. Vous pouvez l'allumer.";
+            statusMsg = "Le stockage est actuellement éteint";
             $('#eteindre-msg').text(statusMsg).removeClass('d-none');
             $('#prolong-msg').addClass('d-none');
         } else {
@@ -752,14 +751,20 @@ function updateAll() {
         // Affichage des boutons
         if (data.storage.status === 'up') {
             $('#btn-on').addClass('d-none');
+            $('#on-duration').removeClass('border-success');
+            $('#on-duration').addClass('border-primary');
             $('#btn-extend').removeClass('d-none');
             $('#btn-off').removeClass('d-none').prop('disabled', otherOwner);
         } else if (data.storage.status === 'down') {
             $('#btn-on').removeClass('d-none').prop('disabled', false);
+            $('#on-duration').removeClass('border-primary');
+            $('#on-duration').addClass('border-success');
             $('#btn-extend').addClass('d-none');
             $('#btn-off').addClass('d-none');
         } else {
             $('#btn-on').removeClass('d-none').prop('disabled', true);
+            $('#on-duration').removeClass('border-primary');
+            $('#on-duration').removeClass('border-success');
             $('#btn-extend').addClass('d-none');
             $('#btn-off').addClass('d-none');
         }
