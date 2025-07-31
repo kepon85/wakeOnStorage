@@ -98,6 +98,7 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS spool (".
     " host TEXT, action TEXT, run_at INTEGER,".
     " user TEXT, ip TEXT, email TEXT, duration REAL DEFAULT 0,".
     " attempts INTEGER DEFAULT 0)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS interface_counts (id TEXT PRIMARY KEY, up INTEGER DEFAULT 0, down INTEGER DEFAULT 0)");
 $cols = $pdo->query("PRAGMA table_info(spool)")->fetchAll(PDO::FETCH_COLUMN,1);
 if (!in_array('email', $cols)) {
     $pdo->exec("ALTER TABLE spool ADD COLUMN email TEXT");
@@ -372,6 +373,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
   </div>
 
 </div>
+<footer class="text-center m-4">
+<?php if (!empty($cfg['interface']['footer'])): ?>
+  <?php echo $cfg['interface']['footer']; ?>  
+<?php endif; ?>
+<?php if (!empty($global['global_footer'])): ?>
+  <div class="text-center mt-2">
+    <?php echo $global['global_footer']; ?>
+  </div>
+<?php endif; ?>
+</footer>
 <?php if (!empty($cfg['interface']['js_include'])): foreach ($cfg['interface']['js_include'] as $js): ?>
 <script src="<?= htmlspecialchars($js) ?>"></script>
 <?php endforeach; endif; ?>

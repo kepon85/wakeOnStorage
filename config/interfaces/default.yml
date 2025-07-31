@@ -1,6 +1,7 @@
 interface:
   name: Wake On Storage - Default
   logo: ./img/WakeOnStorage-FulltLogoBan.png
+  footer: ""
   css:
     - ./css/custom.css
   js_include:

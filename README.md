@@ -81,6 +81,11 @@ Global defaults are stored in `config/global-default.yml`. You may create a
 configurations are located in `config/interfaces/`. Only files prefixed with
 `example` are tracked in Git to avoid leaking secrets.
 
+Each interface can optionally define a `footer` (HTML snippet) displayed above
+the `global_footer` configured in `global.yml`. Both footers may be left empty.
+Successful `storage_up` and `storage_down` actions are counted per interface in
+the `interface_counts` table stored in the SQLite database.
+
 Set `debug: true` in `global.yml` to include verbose logs about API calls in the
 JSON responses returned by `api.php`. When enabled, storage actions (`storage_up`
 and `storage_down`) also return the full request and response details.

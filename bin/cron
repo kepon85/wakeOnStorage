@@ -38,6 +38,7 @@ if (!in_array('duration', $cols)) {
     $pdo->exec("ALTER TABLE spool ADD COLUMN duration REAL DEFAULT 0");
 }
 $pdo->exec("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT, action TEXT, user TEXT, ip TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS interface_counts (id TEXT PRIMARY KEY, up INTEGER DEFAULT 0, down INTEGER DEFAULT 0)");
 
 // Purge old events if over limit
 $maxRows = (int)($global['events']['max_rows'] ?? 0);
@@ -113,6 +114,11 @@ foreach ($tasks as $t) {
     }
     if ($ok) {
         Logger::logEvent($pdo, $host, $action, 'cron');
+        if ($action === 'storage_up') {
+            $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,1,0) ON CONFLICT(id) DO UPDATE SET up=up+1')->execute([$host]);
+        } else {
+            $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,0,1) ON CONFLICT(id) DO UPDATE SET down=down+1')->execute([$host]);
+        }
         $pdo->prepare('DELETE FROM spool WHERE id=?')->execute([$t['id']]);
         if ($action === 'storage_up') {
             $duration = floatval($t['duration'] ?? 0);

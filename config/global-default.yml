@@ -59,3 +59,6 @@ spooler:
 # Maximum number of rows kept in events table
 events:
   max_rows: 1000
+
+# HTML displayed at the very bottom of all interfaces
+global_footer: '<a href="https://retzo.net/wakeonssorage/">Wake On Storage</a>, un service ⛅ <a href="https://retzo.net">Retzo.net</a>.'

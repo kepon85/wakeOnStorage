@@ -14,3 +14,7 @@ body {
   white-space: nowrap;
   display: block;
 }
+
+footer a {
+  text-decoration: none;
+}
