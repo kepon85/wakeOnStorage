@@ -271,72 +271,110 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
 <?php if (!empty($cfg['interface']['css'])): foreach ($cfg['interface']['css'] as $css): ?>
 <link rel="stylesheet" href="<?= htmlspecialchars($css) ?>">
 <?php endforeach; endif; ?>
+<style>
+#solar-forecast {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto;
+  white-space: nowrap;
+  display: block;
+}
+</style>
 </head>
 <body>
 <div class="container mt-4">
-  <header class="d-flex align-items-center mb-3">
-    <?php if (!empty($cfg['interface']['logo'])): ?>
-    <img src="<?= htmlspecialchars($cfg['interface']['logo']) ?>" alt="logo" height="64" class="me-3">
-    <?php endif; ?>
-    <h1 class="h4"><?= htmlspecialchars($cfg['interface']['name'] ?? '') ?></h1>
+  <header class="mb-3">
+    <div class="row align-items-center">
+      <div class="col-lg-7 col-xl-7 d-flex align-items-center mb-3 mb-lg-0 flex-column flex-lg-row text-center text-lg-start">
+        <?php if (!empty($cfg['interface']['logo'])): ?>
+          <img src="<?= htmlspecialchars($cfg['interface']['logo']) ?>" alt="logo" height="64" class="me-lg-3 mb-2 mb-lg-0 mx-auto mx-lg-0">
+        <?php endif; ?>
+        <div class="flex-grow-1">
+          <h1 class="h4 mb-2 mb-lg-1"><?= htmlspecialchars($cfg['interface']['name'] ?? '') ?></h1>
+          <div id="energy-info" class="row justify-content-center justify-content-lg-start mb-0">
+            <div id="battery-info" class="col-auto mb-2 d-none"></div>
+            <div id="solar-production" class="col-auto mb-2 d-none"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5 col-xl-5 mt-3 mt-lg-0 d-flex flex-column align-items-center align-items-lg-end justify-content-center" id="action">
+        <div id="eteindre-msg"></div>
+        <div id="prolong-msg"></div>
+        <div id="router-actions" class="mb-3 d-flex flex-column flex-lg-row align-items-center align-items-lg-end justify-content-center justify-content-lg-end gap-2 w-100" style="max-width:400px;">
+          <div id="on-extend-and-on-with-durantion" class="input-group mb-2 mb-lg-0 w-100" style="min-width:200px;">
+            <button id="btn-extend" class="btn btn-primary d-none" type="button">Prolonger</button>
+            <select id="on-duration" class="border border-primary form-select" style="min-width:90px;">
+              <?php foreach ($wakeTimes as $t): ?>
+              <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?>h</option>
+              <?php endforeach; ?>
+            </select>
+            <button id="btn-on" class="btn btn-success d-none">Allumer</button>
+          </div>
+          <button id="btn-off" class="btn btn-danger mb-2 mb-lg-0 w-100">Eteindre</button>
+        </div>
+      </div>
+    </div>
   </header>
   <?php if ($maintenanceBanner): ?>
   <div class="alert alert-warning text-center mb-3"><?php echo $maintenanceBanner; ?></div>
   <?php endif; ?>
+  
+  <div class="d-flex align-items-center mb-3">
+    <div class="border border-secondary rounded d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width:75px; height:75px; min-width:75px; min-height:75px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="44" height="44" style="display:block;">
+        <path id="storage-status-path" fill="none" stroke="#6c757d" stroke-width="32" d="M352 64C352 46.3 337.7 32 320 32C302.3 32 288 46.3 288 64L288 320C288 337.7 302.3 352 320 352C337.7 352 352 337.7 352 320L352 64zM210.3 162.4C224.8 152.3 228.3 132.3 218.2 117.8C208.1 103.3 188.1 99.8 173.6 109.9C107.4 156.1 64 233 64 320C64 461.4 178.6 576 320 576C461.4 576 576 461.4 576 320C576 233 532.6 156.1 466.3 109.9C451.8 99.8 431.9 103.3 421.7 117.8C411.5 132.3 415.1 152.2 429.6 162.4C479.4 197.2 511.9 254.8 511.9 320C511.9 426 425.9 512 319.9 512C213.9 512 128 426 128 320C128 254.8 160.5 197.1 210.3 162.4z"/>
+      </svg>
+    </div>
+    <div class="flex-grow-1 d-flex flex-column">
+      <div id="solar-forecast" class="mb-2"></div>
+    </div>
+  </div>
 
   <div id="notifications" class="position-fixed top-0 end-0 p-3" style="z-index:1051;"></div>
   <?php if ($message): ?>
   <script>var initialMessage = <?= json_encode($message) ?>;</script>
   <?php endif; ?>
 
-  <form id="router-plan" method="post" class="mb-3 d-none">
-    <div class="mb-3">
-      <p id="router-msg">Le storage ne peut être allumé pour le moment.</p>
-      <label class="form-label">Allumage</label>
-      <select name="router_start" class="form-select mb-2">
-        <option value="asap">Dès que possible</option>
-        <?php foreach ($routerUpOptions as $opt): ?>
-        <option value="<?= htmlspecialchars($opt['value']) ?>"><?= htmlspecialchars($opt['label']) ?></option>
-        <?php endforeach; ?>
-      </select>
-      <label class="form-label">Durée d'allumage</label>
-      <select name="router_end" class="form-select">
-        <?php foreach ($wakeTimes as $t): ?>
-        <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?>h</option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-    <div class="mb-3">
-      <label class="form-label">E-mail de notification (optionnel)</label>
-      <input type="email" name="notify_email" class="form-control">
-    </div>
-    <button type="submit" name="schedule_router" class="btn btn-primary">Planifier l'allumage</button>
-    <button type="button" id="cancel-start" class="btn btn-danger ms-2 d-none">Annuler la demande</button>
-  </form>
-  <div id="router-actions" class="mb-3 d-none">
-    <select id="on-duration" class="form-select d-inline-block w-auto me-2">
-      <?php foreach ($wakeTimes as $t): ?>
-      <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?>h</option>
-      <?php endforeach; ?>
-    </select>
-    <button id="btn-on" class="btn btn-success me-2">Allumer</button>
-    <button id="btn-extend" class="btn btn-primary me-2 d-none">Prolonger</button>
-    <button id="btn-off" class="btn btn-danger">Eteindre</button>
+
+
+
+  <div class="d-flex justify-content-center">
+    <form id="router-plan" method="post" class="mb-3 w-100 d-flex flex-column align-items-center" style="max-width:400px;">
+      <div class="mb-3 w-100">
+        <h4 id="router-msg" class="text-center">Le storage ne peut être allumé pour le moment.</h4>
+        <label class="form-label">Allumage</label>
+        <select name="router_start" class="form-select mb-2">
+          <option value="asap">Dès que possible</option>
+          <?php foreach ($routerUpOptions as $opt): ?>
+          <option value="<?= htmlspecialchars($opt['value']) ?>"><?= htmlspecialchars($opt['label']) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <label class="form-label">Durée d'allumage</label>
+        <select name="router_end" class="form-select">
+          <?php foreach ($wakeTimes as $t): ?>
+          <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?>h</option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="mb-3 w-100">
+        <label class="form-label">E-mail de notification (optionnel)</label>
+        <input type="email" name="notify_email" class="form-control">
+      </div>
+      <div class="d-flex flex-column flex-lg-row gap-2 w-100">
+        <button type="submit" name="schedule_router" class="btn btn-primary w-100">Planifier l'allumage</button>
+        <button type="button" id="cancel-start" class="btn btn-danger w-100 d-none">Annuler la demande</button>
+      </div>
+    </form>
   </div>
-  <div id="down-info" class="alert alert-warning d-none mb-3">
-    Le storage va s'arrêter dans <span id="down-time">--</span>.
-  </div>
-  <div id="energy-info" class="row mb-3">
-    <div id="battery-info" class="col-auto mb-2 d-none"></div>
-    <div id="solar-production" class="col-auto mb-2 d-none"></div>
-    <div id="solar-forecast" class="col mb-2 d-none"></div>
-  </div>
+
   <div id="storage-content" class="mb-3"></div>
   <div id="energy-mode-msg" class="alert alert-info mb-3"></div>
   <div id="loading" style="" class="position-fixed top-0 bottom-0 start-0 end-0 bg-white bg-opacity-50 d-flex flex-column justify-content-center align-items-center" style="z-index:1060;">
     <img src="./img/load.svg" alt="loading" class="mb-3" style="max-width:175px;">
     <p id="loading-text" class="h5 mb-0">Requête sur le serveur en cours...</p>
   </div>
+
 </div>
 <?php if (!empty($cfg['interface']['js_include'])): foreach ($cfg['interface']['js_include'] as $js): ?>
 <script src="<?= htmlspecialchars($js) ?>"></script>
@@ -401,11 +439,37 @@ function showPostDown() {
   var cont = $('#storage-content');
   cont.empty();
   if (storagePostDown.methode === 'redirect-iframe' && storagePostDown.page) {
+    // Mode iframe : pas de fond dark, pas de centrage, pas de taille fixe
     var ifr = $('<iframe>').attr('src', storagePostDown.page)
       .addClass('w-100').css('height', '600px').attr('frameborder', '0');
     cont.append(ifr);
   } else if (storagePostDown.methode === 'text' && storagePostDown.content) {
-    cont.html(storagePostDown.content);
+    // Mode texte : fond dark, centrage, taille 500x500 sur grand écran
+    var wrapper = $('<div>')
+      .addClass('d-flex justify-content-center align-items-center bg-dark text-white')
+      .css({
+        'min-height': '200px',
+        'width': '100%',
+        'border-radius': '12px'
+      });
+    // Responsive : 500x500 sur grand écran, auto sur petit
+    wrapper.css({
+      'max-width': '500px',
+      'max-height': '500px',
+      'margin': '0 auto'
+    });
+    // Utiliser une div interne pour le contenu
+    var inner = $('<div>').addClass('w-100 text-center').css({
+      'padding': '2rem'
+    }).html(storagePostDown.content);
+    wrapper.append(inner);
+    // Adapter la hauteur sur petits écrans
+    if (window.innerWidth >= 768) {
+      wrapper.css('height', '500px');
+    } else {
+      wrapper.css('height', '');
+    }
+    cont.append(wrapper);
   }
   storagePostDownShown = true;
 }
@@ -455,20 +519,7 @@ function updateCountdown() {
   );
 }
 
-function updateDownCountdown() {
-  if (!scheduledDownDate) return;
-  var now = new Date();
-  var diff = scheduledDownDate - now;
-  if (diff < 0) diff = 0;
-  var minutes = Math.floor(diff / 60000);
-  var hours = Math.floor(minutes / 60);
-  minutes = minutes % 60;
-  $('#down-time').text(hours + ' heure(s) et ' + minutes + ' minute(s)');
-  $('#down-info').removeClass('d-none');
-}
-
 setInterval(updateCountdown, 60000);
-setInterval(updateDownCountdown, 60000);
 
 function displayEnergy(data) {
   if (data.batterie) lastBattery = data.batterie;
@@ -482,7 +533,7 @@ function displayEnergy(data) {
   if (energyPrint.production_solaire && lastSolar) {
     var prod = Math.round(lastSolar.value);
     var prodElem = $('#solar-production').removeClass('d-none');
-    prodElem.text('Production: ' + prod + ' W');
+    prodElem.text('Production ☀️ : ' + prod + ' W');
     if (prod > storageConso) {
       prodElem.removeClass('text-danger').addClass('text-success');
     } else {
@@ -490,13 +541,16 @@ function displayEnergy(data) {
     }
   }
   if (energyPrint.production_solaire_estimation && lastForecast) {
-    var cont = $('#solar-forecast').empty();
+    var cont = $('#solar-forecast').removeClass('d-none').empty();
     var arr = lastForecast.values || [];
     if (arr.length) {
-      var limit = 8;
-      var collapsed = $('<span class="forecast-collapsed">').appendTo(cont);
-      var more = $('<span class="forecast-more d-none">').appendTo(cont);
-      arr.forEach(function(f, i){
+      // Afficher tous les items si largeur 0 (premier chargement)
+      var maxWidth = cont.width();
+      if (maxWidth === 0) maxWidth = cont.parent().width() || 9999;
+      var totalWidth = 0;
+      cont.append('<div class="d-inline-block text-center me-2 forecast-item"><div>Prévision</div><div>solaire</div></div>');
+      for (var i = 0; i < arr.length; i++) {
+        var f = arr[i];
         var t = new Date(f.period_end);
         var time = t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
         var icon = f.pv_estimate > 0 ? '☀️' : '☁️';
@@ -508,20 +562,19 @@ function displayEnergy(data) {
         } else {
           item.addClass('text-danger');
         }
-        if (i < limit) item.appendTo(collapsed); else item.appendTo(more);
-      });
-      if (more.children().length) {
-        var toggle = $('<span class="ms-2 forecast-toggle">➕</span>').appendTo(cont);
-        toggle.on('click', function(){
-          more.toggleClass('d-none');
-          $(this).text(more.hasClass('d-none') ? '➕' : '➖');
-        });
+        cont.append(item);
+        var itemWidth = item.outerWidth(true);
+        totalWidth += itemWidth;
+        if (totalWidth > maxWidth) {
+          item.remove();
+          break;
+        }
       }
-      cont.removeClass('d-none');
     } else {
       cont.addClass('d-none');
     }
   }
+    
 }
 
 function computeSolarHours(forecast) {
@@ -657,43 +710,69 @@ function updateAll() {
     if (data.forecast_timestamp) { forecastSince = data.forecast_timestamp; }
     if (data.storage_timestamp) { storageSince = data.storage_timestamp; }
     if (data.storage) {
+        // Récupération de la date d'arrêt programmée
         if (data.storage.scheduled_down) {
             scheduledDownDate = new Date(data.storage.scheduled_down * 1000);
             scheduledDownUser = data.storage.scheduled_down_user || null;
             scheduledDownIp = data.storage.scheduled_down_ip || null;
-            updateDownCountdown();
         } else {
             scheduledDownDate = null;
             scheduledDownUser = null;
             scheduledDownIp = null;
-            $('#down-info').addClass('d-none');
         }
+        // Détermination du propriétaire de l'arrêt programmé
         var otherOwner = false;
-        if (scheduledDownDate && scheduledDownUser !== null) {
-            if ((scheduledDownUser && scheduledDownUser !== currentUser) ||
-                (scheduledDownIp && scheduledDownIp !== currentIp)) {
-                otherOwner = true;
-            }
+        if (scheduledDownUser && ((scheduledDownUser && scheduledDownUser !== currentUser) || (scheduledDownIp && scheduledDownIp !== currentIp))) {
+            otherOwner = true;
         }
+        // Gestion des messages d'état
+        var statusMsg = '';
+        if (data.storage.status === 'up') {
+            if (scheduledDownDate) {
+                var now = new Date();
+                var diff = scheduledDownDate - now;
+                if (diff < 0) diff = 0;
+                var minutes = Math.floor(diff / 60000);
+                var hours = Math.floor(minutes / 60);
+                minutes = minutes % 60;
+                statusMsg = "Le stockage est allumé, il devrait s'arrêter dans " + hours + " heure(s), " + minutes + " minute(s).";
+            } else {
+                statusMsg = "Le stockage est allumé.";
+            }
+            $('#prolong-msg').text(statusMsg).removeClass('d-none');
+            $('#eteindre-msg').addClass('d-none');
+        } else if (data.storage.status === 'down') {
+            statusMsg = "Le stockage est actuellement éteint. Vous pouvez l'allumer.";
+            $('#eteindre-msg').text(statusMsg).removeClass('d-none');
+            $('#prolong-msg').addClass('d-none');
+        } else {
+            $('#prolong-msg').addClass('d-none');
+            $('#eteindre-msg').addClass('d-none');
+        }
+        // Affichage des boutons
         if (data.storage.status === 'up') {
             $('#btn-on').addClass('d-none');
             $('#btn-extend').removeClass('d-none');
-            $('#btn-off').prop('disabled', otherOwner);
+            $('#btn-off').removeClass('d-none').prop('disabled', otherOwner);
         } else if (data.storage.status === 'down') {
             $('#btn-on').removeClass('d-none').prop('disabled', false);
             $('#btn-extend').addClass('d-none');
-            $('#btn-off').prop('disabled', true);
+            $('#btn-off').addClass('d-none');
         } else {
             $('#btn-on').removeClass('d-none').prop('disabled', true);
             $('#btn-extend').addClass('d-none');
-            $('#btn-off').prop('disabled', true);
+            $('#btn-off').addClass('d-none');
         }
+        // Suppression de #down-info
+        $('#down-info').addClass('d-none');
         if (data.storage.status !== lastStorageStatus) {
             if (data.storage.status === 'up') {
                 showPostUp();
                 storagePostDownShown = false;
             } else if (data.storage.status === 'down') {
-                showPostDown();
+                if (!(data.router && data.router.available === false)) {
+                    showPostDown();
+                }
                 storagePostUpShown = false;
             } else {
                 $('#storage-content').empty();
@@ -702,6 +781,10 @@ function updateAll() {
             }
             lastStorageStatus = data.storage.status;
         }
+        var svgColor = '#6c757d';
+        if (data.storage && data.storage.status === 'up') svgColor = '#198754';
+        else if (data.storage && data.storage.status === 'down') svgColor = '#dc3545';
+        $('#storage-status-path').attr('stroke', svgColor);
         if (waitStatus) {
             var desired = waitStatus.action;
             if (data.storage.status === desired) {
