@@ -103,3 +103,12 @@ storage:
     post:
       methode: text
       content: "<p>Stockage arrêté</p>"
+
+cron:
+  spooler:
+    up_but_router_unreachable:
+      #bin: /opt/send.sh
+      #stdin: "Une demande de UP a été faite"
+    down_but_router_unreachable:
+      #bin: /opt/send.sh
+      #stdin: "Une demande de DOWN a été faite"

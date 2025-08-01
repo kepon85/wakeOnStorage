@@ -181,7 +181,22 @@ Utility scripts are provided in `bin/`:
   to the specified credentials file.
 - `bin/cron` processes scheduled actions. Run it periodically (e.g. via cron)
   to execute pending `storage_up`/`storage_down` tasks and purge old events. Use
-  `-v` for verbose output.
+  `-v` for verbose output. When a `storage_up` or `storage_down` task is ready
+  but the router check fails the first time, optional helper commands defined in
+  the interface configuration are triggered:
+
+```yaml
+cron:
+  spooler:
+    up_but_router_unreachable:
+      bin: /opt/send.sh
+      stdin: "Une demande de UP a été faite"
+    down_but_router_unreachable:
+      bin: /opt/send.sh
+      stdin: "Une demande de DOWN a été faite"
+```
+These commands run once when the router is unreachable, before the task is
+retried.
 
 Add crontab : 
 

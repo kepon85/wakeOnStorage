@@ -64,6 +64,41 @@ foreach ($tasks as $t) {
         }
     }
     if (!$routerOk) {
+        if ($action === 'storage_up') {
+            $opt = $cfg['cron']['spooler']['up_but_router_unreachable'] ?? null;
+            if ((int)$t['run_at'] > 0 && $opt && !empty($opt['bin'])) {
+                $proc = proc_open($opt['bin'], [['pipe','r'],['pipe','w'],['pipe','w']], $pipes);
+                if (is_resource($proc)) {
+                    if (!empty($opt['stdin'])) {
+                        fwrite($pipes[0], $opt['stdin']);
+                    }
+                    fclose($pipes[0]);
+                    stream_get_contents($pipes[1]);
+                    fclose($pipes[1]);
+                    stream_get_contents($pipes[2]);
+                    fclose($pipes[2]);
+                    proc_close($proc);
+                }
+                $pdo->prepare('UPDATE spool SET run_at=0 WHERE id=?')->execute([$t['id']]);
+            }
+        } elseif ($action === 'storage_down') {
+            $opt = $cfg['cron']['spooler']['down_but_router_unreachable'] ?? null;
+            if ((int)$t['run_at'] > 0 && $opt && !empty($opt['bin'])) {
+                $proc = proc_open($opt['bin'], [['pipe','r'],['pipe','w'],['pipe','w']], $pipes);
+                if (is_resource($proc)) {
+                    if (!empty($opt['stdin'])) {
+                        fwrite($pipes[0], $opt['stdin']);
+                    }
+                    fclose($pipes[0]);
+                    stream_get_contents($pipes[1]);
+                    fclose($pipes[1]);
+                    stream_get_contents($pipes[2]);
+                    fclose($pipes[2]);
+                    proc_close($proc);
+                }
+                $pdo->prepare('UPDATE spool SET run_at=0 WHERE id=?')->execute([$t['id']]);
+            }
+        }
         if ($verbose) echo "Router unreachable, skipping\n";
         continue;
     }
