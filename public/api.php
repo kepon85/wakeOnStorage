@@ -2,10 +2,10 @@
 session_start();
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use Symfony\Component\Yaml\Yaml;
 use WakeOnStorage\Router;
 use WakeOnStorage\Storage;
 use WakeOnStorage\Logger;
+use WakeOnStorage\Init;
 
 function http_get_json(string $url, array $headers = [], int $timeout = 5): ?array {
     $opts = [
@@ -41,42 +41,14 @@ function cache_fetch(PDO $pdo, string $key, callable $callback, int $ttl, bool $
     return $data;
 }
 
-$global = Yaml::parseFile(__DIR__ . '/../config/global-default.yml');
-$override = __DIR__ . '/../config/global.yml';
-if (file_exists($override)) {
-    $global = array_replace_recursive($global, Yaml::parseFile($override));
-}
-$debugEnabled = !empty($global['debug']);
+$global = Init::globalConfig();
+$host = Init::detectHost();
+$cfg = Init::hostConfig($host, $global);
+$debugEnabled = !empty($global["debug"]);
 $debugLog = [];
-$host = $_SERVER['HTTP_HOST'] ?? 'default';
-$host = preg_replace('/:\d+$/', '', $host);
-$configDir = __DIR__ . '/../' . ($global['interface_config_dir'] ?? 'config/interfaces');
-$file = "$configDir/{$host}.yml";
-if (!file_exists($file)) {
-    $file = "$configDir/default.yml";
-}
-$cfg = Yaml::parseFile($file);
-$energyCorrection = $cfg['energy']['correction'] ?? [];
+$energyCorrection = $cfg["energy"]["correction"] ?? [];
+$pdo = Init::initDb($global);
 
-$dbRelative = $global['db_path'] ?? 'data/wakeonstorage.sqlite';
-$dbPath = realpath(__DIR__ . '/..') . '/' . ltrim($dbRelative, '/');
-$pdo = new PDO('sqlite:' . $dbPath);
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$pdo->exec("CREATE TABLE IF NOT EXISTS data_cache (key TEXT PRIMARY KEY, value TEXT, updated_at INTEGER)");
-$pdo->exec("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT, action TEXT, user TEXT, ip TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
-$pdo->exec("CREATE TABLE IF NOT EXISTS spool (".
-    "id INTEGER PRIMARY KEY AUTOINCREMENT,".
-    " host TEXT, action TEXT, run_at INTEGER,".
-    " user TEXT, ip TEXT, email TEXT, duration REAL DEFAULT 0,".
-    " attempts INTEGER DEFAULT 0)");
-$pdo->exec("CREATE TABLE IF NOT EXISTS interface_counts (id TEXT PRIMARY KEY, up INTEGER DEFAULT 0, down INTEGER DEFAULT 0)");
-$cols = $pdo->query("PRAGMA table_info(spool)")->fetchAll(PDO::FETCH_COLUMN,1);
-if (!in_array('email', $cols)) {
-    $pdo->exec("ALTER TABLE spool ADD COLUMN email TEXT");
-}
-if (!in_array('duration', $cols)) {
-    $pdo->exec("ALTER TABLE spool ADD COLUMN duration REAL DEFAULT 0");
-}
 
 $action = $_POST['action'] ?? ($_GET['action'] ?? null);
 if (in_array($action, ['storage_up', 'storage_down', 'extend_up', 'cancel_up'])) {
