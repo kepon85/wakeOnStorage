@@ -46,6 +46,7 @@ maintenance_message: ""
 # Refresh interval (seconds) for AJAX calls (seconds)
 ajax:
   refresh: 10          # general polling interval
+  refresh_loading: 5   # polling interval while an action is pending (same default as storage_refresh)
   router_refresh: 10    # router status refresh interval
   batterie_refresh: 60
   production_solaire_refresh: 60

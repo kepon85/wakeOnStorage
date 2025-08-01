@@ -378,12 +378,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
 <?php if (!empty($cfg['interface']['js_include'])): foreach ($cfg['interface']['js_include'] as $js): ?>
 <script src="<?= htmlspecialchars($js) ?>"></script>
 <?php endforeach; endif; ?>
-<?php $refresh = (int)($global['ajax']['refresh'] ?? 10); ?>
+<?php
+  $refresh = (int)($global['ajax']['refresh'] ?? 10);
+  $refreshLoading = (int)($global['ajax']['refresh_loading'] ?? 5);
+?>
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script>
 var currentUser = <?= json_encode($authenticatedUser) ?>;
 var currentIp = <?= json_encode($_SERVER['REMOTE_ADDR'] ?? '') ?>;
 var refreshInterval = <?= $refresh ?> * 1000;
+var refreshLoadingInterval = <?= $refreshLoading ?> * 1000;
+var defaultRefreshInterval = refreshInterval;
+var updateInProgress = false;
+var pendingUpdate = false;
+var updateTimer = null;
 var routerSince = 0;
 var batterySince = 0;
 var solarSince = 0;
@@ -656,6 +664,12 @@ function applyEnergyRules(data) {
 }
 
 function updateAll() {
+  if (updateTimer) { clearTimeout(updateTimer); updateTimer = null; }
+  if (updateInProgress) {
+    pendingUpdate = true;
+    return;
+  }
+  updateInProgress = true;
   console.debug('Updating data...');
   if (firstUpdate) {
     $('#loading-text').text('Requête sur le serveur en cours…');
@@ -799,12 +813,14 @@ function updateAll() {
             if (data.storage.status === desired) {
                 $('#loading').addClass('d-none');
                 waitStatus = null;
+                refreshInterval = defaultRefreshInterval;
             } else {
                 var elapsed = Date.now() - waitStatus.start;
                 if (waitStatus.timeout > 0 && elapsed > waitStatus.timeout) {
                     $('#loading-text').text("Le délai est dépassé. Désolé, veuillez contacter l’administrateur, un problème est certainement survenu.");
                     setTimeout(function(){ $('#loading').addClass('d-none'); }, 5000);
                     waitStatus = null;
+                    refreshInterval = defaultRefreshInterval;
                 } else if (waitStatus.time > 0 && elapsed > waitStatus.time) {
                     $('#loading-text').text("C’est un peu long, mais on croise les doigts...");
                 }
@@ -815,11 +831,17 @@ function updateAll() {
     applyEnergyRules(data);
     if (data.debug) console.debug('api debug', data.debug);
   }).always(function() {
+    updateInProgress = false;
     if (firstUpdate) {
       $('#loading').addClass('d-none');
       firstUpdate = false;
     }
-    setTimeout(updateAll, refreshInterval);
+    if (pendingUpdate) {
+      pendingUpdate = false;
+      updateAll();
+    } else {
+      updateTimer = setTimeout(updateAll, refreshInterval);
+    }
   });
 }
 $(updateAll);
@@ -852,6 +874,7 @@ function doStorageAction(act, extra) {
         var txt = act === 'storage_up' ? 'Allumage demandé... patience' : 'Extinction demandée... patience';
         $('#loading-text').text(txt);
         $('#loading').removeClass('d-none');
+        refreshInterval = refreshLoadingInterval;
         updateAll();
         return;
       }
