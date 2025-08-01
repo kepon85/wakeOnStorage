@@ -286,16 +286,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
         </div>
       </div>
       <div class="col-lg-6 col-xl-6 mt-3 mt-lg-0 d-flex flex-column align-items-center align-items-lg-end justify-content-center" id="action">
-        <div id="eteindre-msg"  class="p-1 text-end"></div>
-        <div id="prolong-msg" class="p-1 text-end"></div>
+        <div id="eteindre-msg"  class="p-1 text-end fw-bolder"></div>
+        <div id="prolong-msg" class="p-1 text-end fw-bolder"></div>
         <div id="router-actions" class="mb-3 d-flex flex-column flex-lg-row align-items-center align-items-lg-end justify-content-center justify-content-lg-end gap-2 w-100">
           <div class="btn btn-tertiary border border-secondary rounded d-flex align-items-center justify-content-center flex-shrink-0 align-self-stretch" >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="24" height="24" class="icon-display-block">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="24" height="24" class="icon-display-block"
+              id="storage-status-svg"
+              data-bs-toggle="tooltip"
+              title="Statut : Inconnu">
               <path id="storage-status-path" fill="none" stroke="#6c757d" stroke-width="32" d="M352 64C352 46.3 337.7 32 320 32C302.3 32 288 46.3 288 64L288 320C288 337.7 302.3 352 320 352C337.7 352 352 337.7 352 320L352 64zM210.3 162.4C224.8 152.3 228.3 132.3 218.2 117.8C208.1 103.3 188.1 99.8 173.6 109.9C107.4 156.1 64 233 64 320C64 461.4 178.6 576 320 576C461.4 576 576 461.4 576 320C576 233 532.6 156.1 466.3 109.9C451.8 99.8 431.9 103.3 421.7 117.8C411.5 132.3 415.1 152.2 429.6 162.4C479.4 197.2 511.9 254.8 511.9 320C511.9 426 425.9 512 319.9 512C213.9 512 128 426 128 320C128 254.8 160.5 197.1 210.3 162.4z"/>
             </svg>
           </div>
           <div id="on-extend-and-on-with-durantion" class="input-group mb-2 mb-lg-0 w-100">
-            <button id="btn-extend" class="btn btn-primary d-none" type="button">Prolonger</button>
+              <button id="btn-extend" class="btn btn-primary d-none" type="button">Prolonger</button>
             <button id="btn-on" class="btn btn-success d-none">Allumer</button>
             <select id="on-duration" class="border border-3 form-select">
               <?php foreach ($wakeTimes as $t): ?>
@@ -383,6 +386,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
   $refreshLoading = (int)($global['ajax']['refresh_loading'] ?? 5);
 ?>
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js" integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q" crossorigin="anonymous"></script>
 <script>
 var currentUser = <?= json_encode($authenticatedUser) ?>;
 var currentIp = <?= json_encode($_SERVER['REMOTE_ADDR'] ?? '') ?>;
@@ -411,6 +415,10 @@ var storageConso = <?php echo (int)($cfg['storage']['conso'] ?? 0); ?>;
 var energyMode = <?php echo json_encode($cfg['energy']['mode'] ?? 'all'); ?>;
 var batteryCfg = <?php echo json_encode($cfg['energy']['batterie'] ?? []); ?>;
 var wakeTimesJs = <?php echo json_encode($wakeTimes); ?>;
+var maxWakeTime = Math.max.apply(null, wakeTimesJs.map(function(t){
+  var v = parseFloat(t);
+  return isNaN(v) ? 0 : v;
+}));
 var storageUpTime = <?php echo (int)($cfg['storage']['up']['time'] ?? 0); ?>;
 var storageUpTimeout = <?php echo (int)($cfg['storage']['up']['timeout'] ?? 0); ?>;
 var storageDownTime = <?php echo (int)($cfg['storage']['down']['time'] ?? 0); ?>;
@@ -619,6 +627,12 @@ function updateEnergyModeMsg() {
 function applyEnergyRules(data) {
   var forecast = lastForecast ? lastForecast.values || [] : [];
   var solarHours = computeSolarHours(forecast);
+  var remaining = 0;
+  if (data && data.storage && data.storage.status === 'up' && data.storage.scheduled_down) {
+    var diffMs = data.storage.scheduled_down * 1000 - Date.now();
+    if (diffMs < 0) diffMs = 0;
+    var remaining = diffMs / 3600000;
+  }
 
   var opts = $('#on-duration option, #router-plan select[name="router_end"] option');
   opts.each(function(){
@@ -638,15 +652,17 @@ function applyEnergyRules(data) {
       $(this).removeClass('text-success text-warning');
     }
     $(this).text(label);
-    if (energyMode === 'solar-strict') {
-      $(this).prop('disabled', !solar);
-    } else {
-      $(this).prop('disabled', false);
+    var disabled = false;
+    if (energyMode === 'solar-strict') disabled = !solar;
+    if ($(this).closest('select').attr('id') === 'on-duration') {
+      if (maxWakeTime > 0 && remaining + dur > maxWakeTime) disabled = true;
     }
+    $(this).prop('disabled', disabled);
   });
 
   var selected = $('#on-duration option:selected');
   var disable = false;
+  var extendDisable = false;
   if (energyMode === 'solar-strict') {
     if (solarHours <= 0 || selected.prop('disabled')) disable = true;
   }
@@ -660,6 +676,25 @@ function applyEnergyRules(data) {
   }
   if (disable) {
     $('#btn-on').prop('disabled', true);
+  }
+  var anyEnabled = false;
+  $('#on-duration option').each(function(){
+    if (!$(this).prop('disabled')) anyEnabled = true;
+  });
+  if (!anyEnabled || selected.prop('disabled') || remaining >= maxWakeTime) {
+    extendDisable = true;
+  }
+  if (extendDisable) {
+    $('#btn-extend').prop('disabled', true);
+  } else {
+    $('#btn-extend').prop('disabled', false);
+  }
+
+  // ...dans applyEnergyRules ou updateAll...
+  if ($('#btn-extend').prop('disabled')) {
+    $('#btn-extend').attr('title', "La limite de prolongement est déjà atteinte");
+  } else {
+    $('#btn-extend').attr('title', "");
   }
 }
 
@@ -808,6 +843,18 @@ function updateAll() {
         if (data.storage && data.storage.status === 'up') svgColor = '#198754';
         else if (data.storage && data.storage.status === 'down') svgColor = '#dc3545';
         $('#storage-status-path').attr('stroke', svgColor);
+
+        // ...dans updateAll après avoir changé la couleur du SVG...
+        var svgTitle = "Statut : Inconnu";
+        if (data.storage && data.storage.status === 'up') svgTitle = "Statut : Allumé";
+        else if (data.storage && data.storage.status === 'down') svgTitle = "Statut : Éteint";
+        $('#storage-status-svg').attr('title', svgTitle);
+        // Re-initialise le tooltip Bootstrap
+        var svgEl = document.getElementById('storage-status-svg');
+        if (svgEl) {
+          bootstrap.Tooltip.getOrCreateInstance(svgEl).setContent({ '.tooltip-inner': svgTitle });
+        }
+
         if (waitStatus) {
             var desired = waitStatus.action;
             if (data.storage.status === desired) {
@@ -930,6 +977,12 @@ $('#cancel-start').on('click', function(e){
     updateAll();
   }, 'json');
 });
+
+// Initialiser tous les tooltips Bootstrap
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el){
+  new bootstrap.Tooltip(el);
+});
 </script>
+<script src="app.js"></script>
 </body>
 </html>

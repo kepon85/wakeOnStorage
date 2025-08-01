@@ -55,3 +55,5 @@ footer a {
 #loading img.loading-img {
   max-width: 175px;
 }
+
+#btn-extend:disabled { cursor: not-allowed; }
