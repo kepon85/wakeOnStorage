@@ -24,7 +24,7 @@ function http_get_json(string $url, array $headers = [], int $timeout = 5): ?arr
 }
 
 function cache_fetch(PDO $pdo, string $key, callable $callback, int $ttl, bool $debug, array &$log, string $label): ?array {
-    $stmt = $pdo->prepare('SELECT value, updated_at FROM data_cache WHERE key=?');
+    $stmt = $pdo->prepare('SELECT value, updated_at FROM data_cache WHERE `key`=?');
     $stmt->execute([$key]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($row && time() - (int)$row['updated_at'] < $ttl) {
@@ -35,7 +35,7 @@ function cache_fetch(PDO $pdo, string $key, callable $callback, int $ttl, bool $
     $data = $callback();
     if ($debug) $log[] = $data !== null ? "$label API success" : "$label API failed";
     if ($data !== null) {
-        $stmt = $pdo->prepare('REPLACE INTO data_cache (key, value, updated_at) VALUES (?,?,?)');
+        $stmt = $pdo->prepare('REPLACE INTO data_cache (`key`, value, updated_at) VALUES (?,?,?)');
         $stmt->execute([$key, json_encode($data), time()]);
     }
     return $data;
