@@ -21,23 +21,38 @@ if (!file_exists($file)) {
 }
 
 $cfg = Yaml::parseFile($file);
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title><?= htmlspecialchars($cfg['interface']['title'] ?? 'WakeOnStorage') ?></title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="app.css">
+<?php if (!empty($cfg['interface']['css'])): foreach ($cfg['interface']['css'] as $css): ?>
+<link rel="stylesheet" href="<?= htmlspecialchars($css) ?>">
+<?php endforeach; endif; ?>
+</head>
+
+<?php
 
 $maintenanceActive = !empty($global['maintenance']);
 $maintenanceMessage = $global['maintenance_message'] ?? '';
 if ($maintenanceActive) {
     ?>
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Maintenance</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-</head>
 <body class="container mt-5 text-center">
 <?php if (!empty($cfg['interface']['logo'])): ?>
-<img src="<?= htmlspecialchars($cfg['interface']['logo']) ?>" alt="logo" class="mb-4" style="max-height:150px;">
+<div><img src="<?= htmlspecialchars($cfg['interface']['logo']) ?>" alt="logo" class="mb-4" style="max-height:150px;"></div>
 <?php endif; ?>
-<?= $maintenanceMessage ?: '<p>En maintenance…</p>' ?>
+<div><?= $maintenanceMessage ?: '<p>En maintenance…</p>' ?></div>
+<footer class="text-center m-4">
+<?php if (!empty($global['global_footer'])): ?>
+  <div class="text-center mt-2">
+    <?php echo $global['global_footer']; ?>
+  </div>
+<?php endif; ?>
+</footer>
 </body>
 </html>
 <?php
@@ -152,31 +167,54 @@ if (!$authenticatedUser) {
 if (!$authenticatedUser) {
     $needsUser = in_array('file', $authMethods) || in_array('imap', $authMethods);
     ?>
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Authentification</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-</head>
 <body class="container mt-5">
-  <h1 class="h4 mb-3">Authentification requise</h1>
-  <?php if ($error): ?>
-  <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+  <header class="mb-3">
+    <div class="row">
+      <div class="col-3"></div>
+      <div class="col-6 col-6 d-flex align-items-center mb-3 mb-lg-0 flex-column flex-lg-row text-center text-lg-start">
+        <?php if (!empty($cfg['interface']['logo'])): ?>
+          <img src="<?= htmlspecialchars($cfg['interface']['logo']) ?>" alt="logo" height="94" class="me-lg-3 mb-2 mb-lg-0 mx-auto mx-lg-0">
+        <?php endif; ?>
+        <div class="flex-grow-1">
+          <h1 class="h4 mb-2 mb-lg-1"><?= htmlspecialchars($cfg['interface']['title'] ?? '') ?></h1>
+          <?php if (!empty($cfg['interface']['subTitle'])): ?>
+            <p class="mb-2 mb-lg-1"><?= htmlspecialchars($cfg['interface']['subTitle'] ?? '') ?></p>
+          <?php endif; ?>
+        </div>
+      </div>
+      <div class="col-3"></div>
+    </div>
+  </header>
+  <div class="row">
+    <div class="col-3" ></div>
+    <div class="col-6">
+      <h1 class="h4 mb-3 text-center">Authentification requise</h1>
+      <?php if ($error): ?>
+      <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+      <?php endif; ?>
+      <form method="post">
+        <?php if ($needsUser): ?>
+        <div class="mb-3">
+          <label class="form-label">Utilisateur</label>
+          <input type="text" name="username" class="form-control" required>
+        </div>
+        <?php endif; ?>
+        <div class="mb-3">
+          <label class="form-label">Mot de passe</label>
+          <input type="password" name="password" class="form-control" required>
+        </div>
+        <button type="submit" name="login" class="btn btn-primary w-100">Se connecter</button>
+      </form>
+    </div>
+    <div class="col-3"></div>
+   </div>
+  <footer class="text-center m-4">
+  <?php if (!empty($global['global_footer'])): ?>
+    <div class="text-center mt-2">
+      <?php echo $global['global_footer']; ?>
+    </div>
   <?php endif; ?>
-  <form method="post">
-    <?php if ($needsUser): ?>
-    <div class="mb-3">
-      <label class="form-label">Utilisateur</label>
-      <input type="text" name="username" class="form-control" required>
-    </div>
-    <?php endif; ?>
-    <div class="mb-3">
-      <label class="form-label">Mot de passe</label>
-      <input type="password" name="password" class="form-control" required>
-    </div>
-    <button type="submit" name="login" class="btn btn-primary">Se connecter</button>
-  </form>
+  </footer>
 </body>
 </html>
 <?php
@@ -263,17 +301,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
     $message = 'Planification envoyée';
 }
 ?>
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title><?= htmlspecialchars($cfg['interface']['title'] ?? 'WakeOnStorage') ?></title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="app.css">
-<?php if (!empty($cfg['interface']['css'])): foreach ($cfg['interface']['css'] as $css): ?>
-<link rel="stylesheet" href="<?= htmlspecialchars($css) ?>">
-<?php endforeach; endif; ?>
-</head>
 <body>
 <div class="container mt-4">
   <header class="mb-3">
@@ -317,7 +344,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
     </div>
   </header>
   <?php if ($maintenanceBanner): ?>
-  <div class="alert alert-warning text-center mb-3"><?php echo $maintenanceBanner; ?></div>
+  <div class="alert alert-warning text-center"><?php echo $maintenanceBanner; ?></div>
   <?php endif; ?>
   
   <div id="notifications" class="position-fixed top-0 end-0 p-3" style="z-index:1051;"></div>
@@ -329,7 +356,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
 
 
   <div class="d-flex justify-content-center">
-    <form id="router-plan" method="post" class="mb-3 w-100 d-flex flex-column align-items-center" style="max-width:400px;">
+    <form id="router-plan" method="post" class="d-none mb-3 w-100 d-flex flex-column align-items-center" style="max-width:400px;">
       <div class="mb-3 w-100">
         <h4 class="text-center">Le storage ne peut être allumé pour le moment.</h4>
         <p id="router-msg" class="text-center"></p>
