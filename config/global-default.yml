@@ -10,7 +10,7 @@ mail:
   novalid_cert: false
   bcc:
   storage_up_subject: "Storage {{host}} UP"
-  storage_up_body: "Bonjour,\n\nLe stockage {{host}} est maintenant disponible jusqu'au {{until}} ({{duration}}).\nVous pouvez prolonger cette durée via https://{{host}}."
+  storage_up_body: "Bonjour,\n\nLe stockage {{host}} est maintenant disponible jusqu'au {{until}} ({{duration}}).\nVous pouvez prolonger cette durée via https://{{host}}.\n\nLe service de stockage à froid de https://retzo.net"
 
 data:
   batterie:

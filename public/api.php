@@ -244,12 +244,14 @@ if ($now - $solarSince >= $solarRefresh && !empty($global['data']['production_so
         return http_get_json($cfgSolar['url'], $headers);
     }, $ttl, $debugEnabled, $debugLog, 'PROD_SOL');
     $value = $data['state'] ?? null;
-    if ($value !== null) {
+    if (is_numeric($value)) {
         $value = (int)round($value);
         $value += (int)($energyCorrection['production_solaire'] ?? 0);
         if ($value < 0) $value = 0;
+        $result['production_solaire'] = ['value' => $value];
+    } else {
+        $result['production_solaire'] = ['value' => 'NA'];
     }
-    $result['production_solaire'] = ['value' => ($value !== null ? $value : 'NA')];
     $result['solar_timestamp'] = $now;
 }
 
