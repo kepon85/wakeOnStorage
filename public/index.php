@@ -33,7 +33,7 @@ if ($maintenanceActive) {
     ?>
 <body class="container mt-5 text-center">
 <?php if (!empty($cfg['interface']['logo'])): ?>
-<div><img src="<?= htmlspecialchars($cfg['interface']['logo']) ?>" alt="logo" class="mb-4" style="max-height:150px;"></div>
+<div><img src="<?= htmlspecialchars($cfg['interface']['logo']) ?>" alt="logo" class="mb-4 logo-img"></div>
 <?php endif; ?>
 <div><?= $maintenanceMessage ?: '<p>En maintenance…</p>' ?></div>
 <footer class="text-center m-4">
@@ -288,16 +288,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
       <div class="col-lg-6 col-xl-6 mt-3 mt-lg-0 d-flex flex-column align-items-center align-items-lg-end justify-content-center" id="action">
         <div id="eteindre-msg"  class="p-1 text-end"></div>
         <div id="prolong-msg" class="p-1 text-end"></div>
-        <div id="router-actions" class="mb-3 d-flex flex-column flex-lg-row align-items-center align-items-lg-end justify-content-center justify-content-lg-end gap-2 w-100" style="max-width:400px;">
+        <div id="router-actions" class="mb-3 d-flex flex-column flex-lg-row align-items-center align-items-lg-end justify-content-center justify-content-lg-end gap-2 w-100">
           <div class="btn btn-tertiary border border-secondary rounded d-flex align-items-center justify-content-center flex-shrink-0 align-self-stretch" >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="24" height="24" style="display:block;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="24" height="24" class="icon-display-block">
               <path id="storage-status-path" fill="none" stroke="#6c757d" stroke-width="32" d="M352 64C352 46.3 337.7 32 320 32C302.3 32 288 46.3 288 64L288 320C288 337.7 302.3 352 320 352C337.7 352 352 337.7 352 320L352 64zM210.3 162.4C224.8 152.3 228.3 132.3 218.2 117.8C208.1 103.3 188.1 99.8 173.6 109.9C107.4 156.1 64 233 64 320C64 461.4 178.6 576 320 576C461.4 576 576 461.4 576 320C576 233 532.6 156.1 466.3 109.9C451.8 99.8 431.9 103.3 421.7 117.8C411.5 132.3 415.1 152.2 429.6 162.4C479.4 197.2 511.9 254.8 511.9 320C511.9 426 425.9 512 319.9 512C213.9 512 128 426 128 320C128 254.8 160.5 197.1 210.3 162.4z"/>
             </svg>
           </div>
-          <div id="on-extend-and-on-with-durantion" class="input-group mb-2 mb-lg-0 w-100" style="min-width:200px;">
+          <div id="on-extend-and-on-with-durantion" class="input-group mb-2 mb-lg-0 w-100">
             <button id="btn-extend" class="btn btn-primary d-none" type="button">Prolonger</button>
             <button id="btn-on" class="btn btn-success d-none">Allumer</button>
-            <select id="on-duration" class="border border-3 form-select" style="min-width:90px;">
+            <select id="on-duration" class="border border-3 form-select">
               <?php foreach ($wakeTimes as $t): ?>
               <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?>h</option>
               <?php endforeach; ?>
@@ -312,7 +312,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
   <div class="alert alert-warning text-center"><?php echo $maintenanceBanner; ?></div>
   <?php endif; ?>
   
-  <div id="notifications" class="position-fixed top-0 end-0 p-3" style="z-index:1051;"></div>
+  <div id="notifications" class="position-fixed top-0 end-0 p-3"></div>
   <?php if ($message): ?>
   <script>var initialMessage = <?= json_encode($message) ?>;</script>
   <?php endif; ?>
@@ -321,7 +321,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
 
 
   <div class="d-flex justify-content-center">
-    <form id="router-plan" method="post" class="d-none mb-3 w-100 d-flex flex-column align-items-center" style="max-width:400px;">
+    <form id="router-plan" method="post" class="d-none mb-3 w-100 d-flex flex-column align-items-center">
       <div class="mb-3 w-100">
         <h4 class="text-center">Le storage ne peut être allumé pour le moment.</h4>
         <p id="router-msg" class="text-center"></p>
@@ -359,8 +359,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
     </div>
   </div>
   <div id="energy-mode-msg" class="alert alert-info mb-3"></div>
-  <div id="loading" style="" class="position-fixed top-0 bottom-0 start-0 end-0 bg-white bg-opacity-75 d-flex flex-column justify-content-center align-items-center" style="z-index:1060;">
-    <img src="./img/load.svg" alt="loading" class="mb-3" style="max-width:175px;">
+  <div id="loading" class="position-fixed top-0 bottom-0 start-0 end-0 bg-white bg-opacity-75 d-flex flex-column justify-content-center align-items-center">
+    <img src="./img/load.svg" alt="loading" class="mb-3 loading-img">
     <p id="loading-text" class="h5 mb-0">Requête sur le serveur en cours…</p>
   </div>
 
