@@ -359,7 +359,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
     </div>
   </div>
   <div id="energy-mode-msg" class="alert alert-info mb-3"></div>
-  <div id="loading" style="" class="position-fixed top-0 bottom-0 start-0 end-0 bg-white bg-opacity-50 d-flex flex-column justify-content-center align-items-center" style="z-index:1060;">
+  <div id="loading" style="" class="position-fixed top-0 bottom-0 start-0 end-0 bg-white bg-opacity-75 d-flex flex-column justify-content-center align-items-center" style="z-index:1060;">
     <img src="./img/load.svg" alt="loading" class="mb-3" style="max-width:175px;">
     <p id="loading-text" class="h5 mb-0">Requête sur le serveur en cours…</p>
   </div>
@@ -656,6 +656,7 @@ function applyEnergyRules(data) {
 }
 
 function updateAll() {
+  console.debug('Updating data...');
   if (firstUpdate) {
     $('#loading-text').text('Requête sur le serveur en cours…');
     $('#loading').removeClass('d-none');
@@ -805,7 +806,7 @@ function updateAll() {
                     setTimeout(function(){ $('#loading').addClass('d-none'); }, 5000);
                     waitStatus = null;
                 } else if (waitStatus.time > 0 && elapsed > waitStatus.time) {
-                    $('#loading-text').text("C’est un peu long, mais ça peut encore venir.");
+                    $('#loading-text').text("C’est un peu long, mais on croise les doigts...");
                 }
             }
         }

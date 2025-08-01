@@ -46,11 +46,11 @@ maintenance_message: ""
 # Refresh interval (seconds) for AJAX calls (seconds)
 ajax:
   refresh: 10          # general polling interval
-  router_refresh: 10   # router status refresh interval
+  router_refresh: 10    # router status refresh interval
   batterie_refresh: 60
   production_solaire_refresh: 60
   production_solaire_estimation_refresh: 60
-  storage_refresh: 10
+  storage_refresh: 5
 
 # Spooler configuration
 spooler:
