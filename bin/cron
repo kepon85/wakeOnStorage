@@ -124,9 +124,17 @@ foreach ($tasks as $t) {
     if ($ok) {
         Logger::logEvent($pdo, $host, $action, 'cron');
         if ($action === 'storage_up') {
-            $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,1,0) ON CONFLICT(id) DO UPDATE SET up=up+1')->execute([$host]);
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+                $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,1,0) ON DUPLICATE KEY UPDATE up=up+1')->execute([$host]);
+            } else {
+                $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,1,0) ON CONFLICT(id) DO UPDATE SET up=up+1')->execute([$host]);
+            }
         } else {
-            $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,0,1) ON CONFLICT(id) DO UPDATE SET down=down+1')->execute([$host]);
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+                $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,0,1) ON DUPLICATE KEY UPDATE down=down+1')->execute([$host]);
+            } else {
+                $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,0,1) ON CONFLICT(id) DO UPDATE SET down=down+1')->execute([$host]);
+            }
         }
         $pdo->prepare('DELETE FROM spool WHERE id=?')->execute([$t['id']]);
         if ($action === 'storage_up') {

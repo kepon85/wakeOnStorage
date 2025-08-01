@@ -84,11 +84,34 @@ configurations are located in `config/interfaces/`. Only files prefixed with
 Each interface can optionally define a `footer` (HTML snippet) displayed above
 the `global_footer` configured in `global.yml`. Both footers may be left empty.
 Successful `storage_up` and `storage_down` actions are counted per interface in
-the `interface_counts` table stored in the SQLite database.
+the `interface_counts` table stored in the configured database.
 
 Set `debug: true` in `global.yml` to include verbose logs about API calls in the
 JSON responses returned by `api.php`. When enabled, storage actions (`storage_up`
 and `storage_down`) also return the full request and response details.
+
+### Database
+
+SQLite is used by default. The connection parameters can be changed in
+`global.yml` under the `db` section:
+
+```yaml
+db:
+  type: sqlite
+  path: data/wakeonstorage.sqlite
+```
+
+To use MySQL or MariaDB instead:
+
+```yaml
+db:
+  type: mysql
+  host: localhost
+  port: 3306
+  name: wakeonstorage
+  user: wakeonstorage
+  password: secret
+```
 
 ### Energy modes
 
@@ -112,7 +135,7 @@ An information banner at the bottom of the interface describes the active mode a
 `public/api.php` exposes various data points used by the interfaces. Each source
 is configured under the `data` section of the merged `global-default.yml`/`global.yml`
 configuration with a refresh
-interval declared in `ajax:`. Responses are cached in the SQLite database.
+interval declared in `ajax:`. Responses are cached in the configured database.
 
 Available sources:
 

@@ -65,7 +65,11 @@ if (in_array($action, ['storage_up', 'storage_down', 'extend_up', 'cancel_up']))
         $stmt = $pdo->prepare("INSERT INTO events (host, action, user, ip) VALUES (?,?,?,?)");
         $stmt->execute([$host, $action, is_string($user) ? $user : '', $_SERVER['REMOTE_ADDR'] ?? '']);
         if ($ok) {
-            $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,1,0) ON CONFLICT(id) DO UPDATE SET up=up+1')->execute([$host]);
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+                $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,1,0) ON DUPLICATE KEY UPDATE up=up+1')->execute([$host]);
+            } else {
+                $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,1,0) ON CONFLICT(id) DO UPDATE SET up=up+1')->execute([$host]);
+            }
             $dur = floatval($_POST['duration'] ?? ($_GET['duration'] ?? 0));
             if ($dur > 0) {
                 $runAt = time() + (int)($dur * 3600);
@@ -113,7 +117,11 @@ if (in_array($action, ['storage_up', 'storage_down', 'extend_up', 'cancel_up']))
             if ($ok) {
                 $pdo->prepare("DELETE FROM spool WHERE host=? AND action='storage_down'")->execute([$host]);
                 Logger::logEvent($pdo, $host, 'storage_down', is_string($user) ? $user : '');
-                $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,0,1) ON CONFLICT(id) DO UPDATE SET down=down+1')->execute([$host]);
+                if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+                    $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,0,1) ON DUPLICATE KEY UPDATE down=down+1')->execute([$host]);
+                } else {
+                    $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,0,1) ON CONFLICT(id) DO UPDATE SET down=down+1')->execute([$host]);
+                }
             } elseif ($apiInfo && ($apiInfo['info'] ?? '') === 'connections_active') {
                 $reason = 'connections_active';
                 $connCount = (int)($apiInfo['count'] ?? 0);
