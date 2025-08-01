@@ -184,6 +184,9 @@ Utility scripts are provided in `bin/`:
   `-v` for verbose output. When a `storage_up` or `storage_down` task is ready
   but the router check fails the first time, optional helper commands defined in
   the interface configuration are triggered:
+- `bin/cli spool [-n N]` lists pending spool entries (default 10).
+  `bin/cli event [-h HOST] [-u USER] [-i IP] [-n N]` shows recent events
+  filtered by host, user and IP.
 
 ```yaml
 cron:
