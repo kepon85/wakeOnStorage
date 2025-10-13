@@ -25,7 +25,12 @@ if ($maxRows > 0) {
     $cnt = (int)$pdo->query('SELECT COUNT(*) FROM events')->fetchColumn();
     if ($cnt > $maxRows) {
         $del = $cnt - $maxRows;
-        $pdo->exec("DELETE FROM events WHERE id IN (SELECT id FROM events ORDER BY id ASC LIMIT $del)");
+        $stmt = $pdo->query("SELECT id FROM events ORDER BY id ASC LIMIT $del");
+        $ids = $stmt ? $stmt->fetchAll(PDO::FETCH_COLUMN) : [];
+        if (!empty($ids)) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $pdo->prepare("DELETE FROM events WHERE id IN ($placeholders)")->execute($ids);
+        }
     }
 }
 
