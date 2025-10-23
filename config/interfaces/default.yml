@@ -2,10 +2,14 @@ interface:
   name: Wake On Storage - Default
   logo: ./img/WakeOnStorage-FulltLogoBan.png
   footer: ""
-  css:
-    - ./css/custom.css
-  js_include:
-    - ./js/custom.js
+  maintenance: false
+  maintenance_message: ""
+  include_html_header: ""
+  include_html_footer: ""
+  #~ css:
+    #~ - ./css/custom.css
+  #~ js_include:
+    #~ - ./js/custom.js
 auth:
   method:
     - uniq
@@ -14,7 +18,7 @@ auth:
 router:
   router_check:
     methode: ping
-    host: nas.retzo.net
+    host: littledc1.retzo.net
     count: 1
     timeout: 1
   router_up:
@@ -52,10 +56,10 @@ storage:
   check:
     methode: api
     param:
-      url: "http://wakeonstorage-local-test.retzo.net/api/nas/status"
+      url: "https://littledc1.retzo.net/wos-api/index.php/api/pi0ddusb1/status"
       auth: 
         type: bearer
-        tocken: "mysecrettoken"
+        tocken: "Pgd4cyhUrA3gWgcR0zugZ0qbi0M3PTjGk"
       headers:
         Content-Type: application/json
       method: GET
@@ -64,10 +68,10 @@ storage:
   up:
     methode: api
     param:
-      url: "http://wakeonstorage-local-test.retzo.net/api/nas/up"	
+      url: "https://littledc1.retzo.net/wos-api/index.php/api/pi0ddusb1/up"	
       auth: 
         type: bearer
-        tocken: "mysecrettoken"
+        tocken: "Pgd4cyhUrA3gWgcR0zugZ0qbi0M3PTjGk"
       headers:
         Content-Type: application/json
         Content-Length: 0
@@ -81,14 +85,14 @@ storage:
     timeout: 300 # Temps après lequel on considère qu'il y a un problème
     post:
       methode: redirect-iframe
-      page: http://192.168.1.253:52000/ddusb1/
+      page: http://littledc1.retzo.net/demo/
   down:
     methode: api
     param:
-      url: "http://wakeonstorage-local-test.retzo.net/api/nas/down"
+      url: "https://littledc1.retzo.net/wos-api/index.php/api/pi0ddusb1/down"
       auth: 
         type: bearer
-        tocken: "mysecrettoken"
+        tocken: "Pgd4cyhUrA3gWgcR0zugZ0qbi0M3PTjGk"
       headers:
         Content-Type: application/json
         Content-Length: 0

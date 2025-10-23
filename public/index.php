@@ -27,8 +27,28 @@ $pdo = Init::initDb($global);
 
 <?php
 
+$interfaceCfg = $cfg['interface'] ?? [];
+$interfaceMaintenanceActive = !empty($interfaceCfg['maintenance']);
+$interfaceMaintenanceMessage = $interfaceCfg['maintenance_message'] ?? '';
+if (!is_string($interfaceMaintenanceMessage)) {
+    $interfaceMaintenanceMessage = '';
+}
+$interfaceHtmlHeader = $interfaceCfg['include_html_header'] ?? '';
+if (!is_string($interfaceHtmlHeader)) {
+    $interfaceHtmlHeader = '';
+}
+$interfaceHtmlFooter = $interfaceCfg['include_html_footer'] ?? '';
+if (!is_string($interfaceHtmlFooter)) {
+    $interfaceHtmlFooter = '';
+}
+
 $maintenanceActive = !empty($global['maintenance']);
 $maintenanceMessage = $global['maintenance_message'] ?? '';
+
+if (!is_string($maintenanceMessage)) {
+    $maintenanceMessage = '';
+}
+
 if ($maintenanceActive) {
     ?>
 <body class="container mt-5 text-center">
@@ -49,7 +69,36 @@ if ($maintenanceActive) {
     exit;
 }
 
-$maintenanceBanner = $maintenanceMessage;
+
+if ($interfaceMaintenanceActive) {
+    ?>
+<body class="container mt-5 text-center">
+<?php if (!empty($cfg['interface']['logo'])): ?>
+<div><img src="<?= htmlspecialchars($cfg['interface']['logo']) ?>" alt="logo" class="mb-4 logo-img"></div>
+<?php endif; ?>
+<div><?= $interfaceMaintenanceMessage ?: ($maintenanceMessage ?: '<p>En maintenance…</p>') ?></div>
+<footer class="text-center m-4">
+<?php if (!empty($global['global_footer'])): ?>
+  <div class="text-center mt-2">
+    <?php echo $global['global_footer']; ?>
+  </div>
+<?php endif; ?>
+</footer>
+</body>
+</html>
+<?php
+    exit;
+}
+
+$maintenanceBannerParts = [];
+if ($maintenanceMessage) {
+    $maintenanceBannerParts[] = $maintenanceMessage;
+}
+if ($interfaceMaintenanceMessage) {
+    $maintenanceBannerParts[] = $interfaceMaintenanceMessage;
+}
+$maintenanceBannerParts = array_values(array_unique($maintenanceBannerParts));
+$maintenanceBanner = implode('', $maintenanceBannerParts);
 
 // Allow overriding the post.up page via ?post_up=<url>
 $overridePostUp = $_GET['post_up'] ?? null;
@@ -314,7 +363,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
   <?php if ($maintenanceBanner): ?>
   <div class="alert alert-warning text-center"><?php echo $maintenanceBanner; ?></div>
   <?php endif; ?>
-  
+  <?php if (!empty($interfaceHtmlHeader)): ?>
+  <div class="interface-html-header mb-3"><?php echo $interfaceHtmlHeader; ?></div>
+  <?php endif; ?>
   <div id="notifications" class="position-fixed top-0 end-0 p-3"></div>
   <?php if ($message): ?>
   <script>var initialMessage = <?= json_encode($message) ?>;</script>
@@ -356,11 +407,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
   </div>
 
   <div id="storage-content" class="mb-3"></div>
+  <?php if (!empty($interfaceHtmlFooter)): ?>
+  <div class="interface-html-footer mb-3"><?php echo $interfaceHtmlFooter; ?></div>
+  <?php endif; ?>
   <div class="d-flex align-items-center mb-3">
     <div class="flex-grow-1 d-flex flex-column">
       <div id="solar-forecast" class="mb-2"></div>
     </div>
   </div>
+
   <div id="energy-mode-msg" class="alert alert-info mb-3"></div>
   <div id="loading" class="position-fixed top-0 bottom-0 start-0 end-0 bg-white bg-opacity-75 d-flex flex-column justify-content-center align-items-center">
     <img src="./img/load.svg" alt="loading" class="mb-3 loading-img">
