@@ -49,6 +49,16 @@ $debugLog = [];
 $energyCorrection = $cfg["energy"]["correction"] ?? [];
 $pdo = Init::initDb($global);
 
+$tokenSessionKey = 'wos_token_' . $host;
+$sessionToken = $_SESSION[$tokenSessionKey] ?? null;
+$providedToken = $_POST['token'] ?? ($_GET['token'] ?? null);
+if (!is_string($sessionToken) || $sessionToken === '' || !is_string($providedToken) || !hash_equals($sessionToken, $providedToken)) {
+    header('Content-Type: application/json');
+    http_response_code(403);
+    echo json_encode(['error' => 'forbidden']);
+    exit;
+}
+
 
 $action = $_POST['action'] ?? ($_GET['action'] ?? null);
 if (in_array($action, ['storage_up', 'storage_down', 'extend_up', 'cancel_up'])) {

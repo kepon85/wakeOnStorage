@@ -11,6 +11,12 @@ $global = Init::globalConfig();
 $host = Init::detectHost();
 $cfg = Init::hostConfig($host, $global);
 $pdo = Init::initDb($global);
+
+$tokenSessionKey = 'wos_token_' . $host;
+if (!isset($_SESSION[$tokenSessionKey]) || !is_string($_SESSION[$tokenSessionKey]) || $_SESSION[$tokenSessionKey] === '') {
+    $_SESSION[$tokenSessionKey] = bin2hex(random_bytes(32));
+}
+$apiToken = $_SESSION[$tokenSessionKey];
 ?>
 
 <!DOCTYPE html>
@@ -443,6 +449,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js" integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q" crossorigin="anonymous"></script>
 <script>
+var wosApiToken = <?= json_encode($apiToken) ?>;
 var currentUser = <?= json_encode($authenticatedUser) ?>;
 var currentIp = <?= json_encode($_SERVER['REMOTE_ADDR'] ?? '') ?>;
 var refreshInterval = <?= $refresh ?> * 1000;
@@ -766,6 +773,7 @@ function updateAll() {
     $('#loading').removeClass('d-none');
   }
   $.getJSON('api.php', {
+      token: wosApiToken,
       router_since: routerSince,
       battery_since: batterySince,
       solar_since: solarSince,
@@ -956,6 +964,7 @@ function doStorageAction(act, extra) {
   if (extra) {
     for (var k in extra) data[k] = extra[k];
   }
+  data.token = wosApiToken;
   $.post('api.php', data, function(res) {
     if (res && res.success) {
       var msg = 'Action effectuée.';
@@ -1026,7 +1035,7 @@ $('#btn-extend').on('click', function(e){
 
 $('#cancel-start').on('click', function(e){
   e.preventDefault();
-  $.post('api.php', {action: 'cancel_up'}, function(){
+  $.post('api.php', {action: 'cancel_up', token: wosApiToken}, function(){
     notify('info', 'Demande annulée');
     routerSince = 0;
     updateAll();
