@@ -1,5 +1,6 @@
 interface:
-  name: Wake On Storage - Default
+  name: Wake On Storage
+  subTitle: Default config
   logo: ./img/WakeOnStorage-FulltLogoBan.png
   footer: ""
   maintenance: false
