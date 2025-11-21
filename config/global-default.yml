@@ -1,0 +1,72 @@
+contact_admin:
+  name: Admin
+  email: admin@example.com
+mail:
+  host: localhost
+  port: 25
+  secure: 
+  username: 
+  password: 
+  novalid_cert: false
+  bcc:
+  storage_up_subject: "Storage {{host}} UP"
+  storage_up_body: "Bonjour,\n\nLe stockage {{host}} est maintenant disponible jusqu'au {{until}} ({{duration}}).\nVous pouvez prolonger cette durée via https://{{host}}.\n\nLe service de stockage à froid de https://retzo.net"
+
+data:
+  batterie:
+    - url: https://wakeonstorage-local.retzo.net:8123/api/states/sensor.batterie_soc
+      token: mysecrettoken
+      ttl: 600        # cache lifetime in seconds
+      type: home_assistant
+  production_solaire:
+    url: https://wakeonstorage-local.retzo.net:8123/api/states/sensor.prod_solaire
+    token: mysecrettoken
+    ttl: 600
+    type: home_assistant
+  production_solaire_estimation:
+    url: https://api.solcast.com.au/rooftop_sites/xxx-xxx-xxx-xxx/forecasts?format=json
+    token: mysecrettoken
+    ttl: 10800
+    type: solcast
+
+interface_config_dir: config/interfaces
+
+db:
+  type: sqlite
+  path: data/wakeonstorage.sqlite
+  #host: localhost
+  #port: 3306
+  #name: wakeonstorage
+  #user: wakeonstorage
+  #password:
+
+# Enable verbose API logging in responses
+debug: false
+
+# Global maintenance mode. When true, the interface only displays the message
+# below and skips all API calls.
+maintenance: false
+# Optional HTML message displayed when maintenance is active. If set while
+# maintenance is false, the message will still appear as a non-blocking notice.
+maintenance_message: ""
+
+# Refresh interval (seconds) for AJAX calls (seconds)
+ajax:
+  refresh: 10          # general polling interval
+  refresh_loading: 5   # polling interval while an action is pending (same default as storage_refresh)
+  router_refresh: 10    # router status refresh interval
+  batterie_refresh: 60
+  production_solaire_refresh: 60
+  production_solaire_estimation_refresh: 60
+  storage_refresh: 5
+
+# Spooler configuration
+spooler:
+  max_attempts: 999999       # retry attempts for failed actions
+
+# Maximum number of rows kept in events table
+events:
+  max_rows: 1000
+
+# HTML displayed at the very bottom of all interfaces
+global_footer: '<a href="https://retzo.net/wakeonstorage/">Wake On Storage</a>, un service de stockage à froid proposé par <a href="https://retzo.net">Retzo.net</a>  ⛅'

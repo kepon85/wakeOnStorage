@@ -1,0 +1,119 @@
+interface:
+  name: Wake On Storage
+  subTitle: Default config
+  logo: ./img/WakeOnStorage-FulltLogoBan.png
+  footer: ""
+  maintenance: false
+  maintenance_message: ""
+  include_html_header: ""
+  include_html_footer: ""
+  #~ css:
+    #~ - ./css/custom.css
+  #~ js_include:
+    #~ - ./js/custom.js
+auth:
+  method:
+    - uniq
+  uniq:
+    password_hash: "$2y$10$Pbuw5/s64M66RX.8bndBL.GF9solS6Yeu6lDiIwa28n4aqfb3PU0y"   # demo
+router:
+  router_check:
+    methode: ping
+    host: littledc1.retzo.net
+    count: 1
+    timeout: 1
+  router_up:
+    - "09:00"
+    - "12:00"
+energy:
+  mode: solar-stric
+  batterie:
+    id: 0
+    soc_mini: 30
+  interface_print:
+    production_solaire_estimation: true
+    batterie: false
+    production_solaire: true
+  correction:
+    production_solaire: -30
+    production_solaire_estimation: -30
+ajax:
+  refresh: 10
+  router_refresh: 10
+#  file:
+#    path: /path/to/passwd.txt     # lines formatted "user:password"
+#  imap:
+#    server: imap.example.com
+#    port: 993
+#    secure: ssl
+storage:
+  conso: 5
+  wake_time:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+  check:
+    methode: api
+    param:
+      url: "https://littledc1.retzo.net/wos-api/index.php/api/pi0ddusb1/status"
+      auth: 
+        type: bearer
+        tocken: "Pgd4cyhUrA3gWgcR0zugZ0qbi0M3PTjGk"
+      headers:
+        Content-Type: application/json
+      method: GET
+      expected_result:
+        status_code: 200
+  up:
+    methode: api
+    param:
+      url: "https://littledc1.retzo.net/wos-api/index.php/api/pi0ddusb1/up"	
+      auth: 
+        type: bearer
+        tocken: "Pgd4cyhUrA3gWgcR0zugZ0qbi0M3PTjGk"
+      headers:
+        Content-Type: application/json
+        Content-Length: 0
+      method: POST
+      expected_result:
+         status_code: 200
+         json:
+           path: "$.success"
+           equals: true
+    time: 120 # Temps de démarrage attendu (après un up) en secondes
+    timeout: 300 # Temps après lequel on considère qu'il y a un problème
+    post:
+      methode: redirect-iframe
+      page: http://littledc1.retzo.net/demo/
+  down:
+    methode: api
+    param:
+      url: "https://littledc1.retzo.net/wos-api/index.php/api/pi0ddusb1/down"
+      auth: 
+        type: bearer
+        tocken: "Pgd4cyhUrA3gWgcR0zugZ0qbi0M3PTjGk"
+      headers:
+        Content-Type: application/json
+        Content-Length: 0
+      method: POST
+      expected_result:
+         status_code: 200
+         json:
+           path: "$.success"
+           equals: true
+    time: 60
+    timeout: 120
+    post:
+      methode: text
+      content: "<p>Stockage arrêté</p>"
+
+cron:
+  spooler:
+    up_but_router_unreachable:
+      #bin: /opt/send.sh
+      #stdin: "Une demande de UP a été faite"
+    down_but_router_unreachable:
+      #bin: /opt/send.sh
+      #stdin: "Une demande de DOWN a été faite"
