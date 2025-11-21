@@ -1,0 +1,206 @@
+#!/usr/bin/env php
+<?php
+require __DIR__ . '/../vendor/autoload.php';
+
+use WakeOnStorage\Storage;
+use WakeOnStorage\Logger;
+use WakeOnStorage\Router;
+use WakeOnStorage\Mailer;
+use WakeOnStorage\Init;
+
+$opts = getopt('v', ['verbose', 'debug']);
+$verbose = isset($opts['v']) || isset($opts['verbose']);
+$debug = $verbose || isset($opts['debug']);
+
+$global = Init::globalConfig();
+$mailCfg = $global["mail"] ?? [];
+$fromName = $global["contact_admin"]["name"] ?? "Admin";
+$fromEmail = $global["contact_admin"]["email"] ?? "";
+
+$pdo = Init::initDb($global);
+
+// Purge old events if over limit
+$maxRows = (int)($global['events']['max_rows'] ?? 0);
+if ($maxRows > 0) {
+    $cnt = (int)$pdo->query('SELECT COUNT(*) FROM events')->fetchColumn();
+    if ($cnt > $maxRows) {
+        $del = $cnt - $maxRows;
+        $stmt = $pdo->query("SELECT id FROM events ORDER BY id ASC LIMIT $del");
+        $ids = $stmt ? $stmt->fetchAll(PDO::FETCH_COLUMN) : [];
+        if (!empty($ids)) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $pdo->prepare("DELETE FROM events WHERE id IN ($placeholders)")->execute($ids);
+        }
+    }
+}
+
+$retryMax = (int)($global['spooler']['max_attempts'] ?? 3);
+$now = time();
+$stmt = $pdo->prepare('SELECT * FROM spool WHERE run_at <= ? ORDER BY run_at ASC');
+$stmt->execute([$now]);
+$tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+
+foreach ($tasks as $t) {
+    $host = $t['host'];
+    $action = $t['action'];
+    if ($verbose) echo date('c') . " Processing $host $action\n";
+
+    $cfg = Init::hostConfig($host, $global);
+    if (!$cfg) {
+        if ($verbose) echo "Config for $host not found\n";
+        $pdo->prepare('DELETE FROM spool WHERE id=?')->execute([$t['id']]);
+        continue;
+    }
+
+    $routerOk = true;
+    if (!empty($cfg['router']['router_check'])) {
+        $rc = $cfg['router']['router_check'];
+        if (($rc['methode'] ?? '') === 'ping') {
+            $hostCheck = $rc['host'] ?? 'localhost';
+            $count = (int)($rc['count'] ?? 1);
+            $timeout = (int)($rc['timeout'] ?? 1);
+            $routerOk = Router::ping($hostCheck, $count, $timeout);
+            Logger::logEvent($pdo, 'router', $routerOk ? 'ping_ok' : 'ping_fail', 'cron');
+            if ($verbose) {
+                echo ($routerOk ? "Router ping OK\n" : "Router ping failed\n");
+            }
+        }
+    }
+    if (!$routerOk) {
+        if ($action === 'storage_up') {
+            $opt = $cfg['cron']['spooler']['up_but_router_unreachable'] ?? null;
+            if ((int)$t['run_at'] > 0 && $opt && !empty($opt['bin'])) {
+                $proc = proc_open($opt['bin'], [['pipe','r'],['pipe','w'],['pipe','w']], $pipes);
+                if (is_resource($proc)) {
+                    if (!empty($opt['stdin'])) {
+                        fwrite($pipes[0], $opt['stdin']);
+                    }
+                    fclose($pipes[0]);
+                    stream_get_contents($pipes[1]);
+                    fclose($pipes[1]);
+                    stream_get_contents($pipes[2]);
+                    fclose($pipes[2]);
+                    proc_close($proc);
+                }
+                $pdo->prepare('UPDATE spool SET run_at=0 WHERE id=?')->execute([$t['id']]);
+            }
+        } elseif ($action === 'storage_down') {
+            $opt = $cfg['cron']['spooler']['down_but_router_unreachable'] ?? null;
+            if ((int)$t['run_at'] > 0 && $opt && !empty($opt['bin'])) {
+                $proc = proc_open($opt['bin'], [['pipe','r'],['pipe','w'],['pipe','w']], $pipes);
+                if (is_resource($proc)) {
+                    if (!empty($opt['stdin'])) {
+                        fwrite($pipes[0], $opt['stdin']);
+                    }
+                    fclose($pipes[0]);
+                    stream_get_contents($pipes[1]);
+                    fclose($pipes[1]);
+                    stream_get_contents($pipes[2]);
+                    fclose($pipes[2]);
+                    proc_close($proc);
+                }
+                $pdo->prepare('UPDATE spool SET run_at=0 WHERE id=?')->execute([$t['id']]);
+            }
+        }
+        if ($verbose) echo "Router unreachable, skipping\n";
+        continue;
+    }
+
+    $desired = $action === 'storage_up' ? 'up' : 'down';
+    $status = null;
+    if (!empty($cfg['storage']['check'])) {
+        $status = Storage::checkStatus($cfg['storage']['check'], $debug, $log);
+    }
+    if ($status === $desired) {
+        Logger::logEvent($pdo, $host, $action . '_skip', 'cron');
+        $pdo->prepare('DELETE FROM spool WHERE id=?')->execute([$t['id']]);
+        if ($verbose) echo "Already $desired\n";
+        continue;
+    }
+    $cfgAct = $cfg['storage'][$action === 'storage_up' ? 'up' : 'down'] ?? null;
+    $ok = false;
+    $log = [];
+    $apiInfo = null;
+    if ($cfgAct) {
+        $ok = Storage::trigger($cfgAct, $debug, $log, $apiInfo);
+    }
+    if ($ok) {
+        Logger::logEvent($pdo, $host, $action, 'cron');
+        if ($action === 'storage_up') {
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+                $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,1,0) ON DUPLICATE KEY UPDATE up=up+1')->execute([$host]);
+            } else {
+                $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,1,0) ON CONFLICT(id) DO UPDATE SET up=up+1')->execute([$host]);
+            }
+        } else {
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+                $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,0,1) ON DUPLICATE KEY UPDATE down=down+1')->execute([$host]);
+            } else {
+                $pdo->prepare('INSERT INTO interface_counts (id, up, down) VALUES (?,0,1) ON CONFLICT(id) DO UPDATE SET down=down+1')->execute([$host]);
+            }
+        }
+        $pdo->prepare('DELETE FROM spool WHERE id=?')->execute([$t['id']]);
+        if ($action === 'storage_up') {
+            $duration = floatval($t['duration'] ?? 0);
+            $downAt = null;
+            if ($duration > 0) {
+                $downAt = time() + (int)($duration * 3600);
+                $row = $pdo->prepare("SELECT id FROM spool WHERE host=? AND action='storage_down' AND user=? AND ip=? LIMIT 1");
+                $row->execute([$host, $t['user'], $t['ip']]);
+                $d = $row->fetch(PDO::FETCH_ASSOC);
+                if ($d) {
+                    $pdo->prepare('UPDATE spool SET run_at=? WHERE id=?')->execute([$downAt, $d['id']]);
+                } else {
+                    $pdo->prepare('INSERT INTO spool (host, action, run_at, user, ip, email) VALUES (?,?,?,?,?,?)')
+                        ->execute([$host, 'storage_down', $downAt, $t['user'], $t['ip'], '']);
+                }
+                Logger::logEvent($pdo, $host, 'schedule_down', 'cron');
+            }
+            if (!empty($t['email'])) {
+                $until = $downAt ? date('d/m/Y H:i', $downAt) : '';
+                $dur = $downAt ? round(($downAt - time()) / 3600, 1) . 'h' : '';
+                $subj = $mailCfg['storage_up_subject'] ?? 'Storage ' . $host . ' UP';
+                $body = $mailCfg['storage_up_body'] ?? (
+                    'Le stockage ' . $host . ' est maintenant disponible.'
+                );
+                $search = ['{{host}}', '{{until}}', '{{duration}}'];
+                $replace = [$host, $until, $dur];
+                $subj = str_replace($search, $replace, $subj);
+                $body = str_replace($search, $replace, $body);
+                Mailer::send($mailCfg, $fromName, $fromEmail, $t['email'], $subj, $body);
+            }
+        }
+        if ($verbose) echo "Success\n";
+    } else {
+        $attempts = (int)$t['attempts'] + 1;
+        $isConn = $apiInfo && ($apiInfo['info'] ?? '') === 'connections_active';
+        if ($isConn) {
+            Logger::logEvent($pdo, $host, $action . '_conn_active', 'cron');
+            if ($verbose) {
+                $cnt = (int)($apiInfo['count'] ?? 0);
+                echo $cnt . ' connexion' . ($cnt > 1 ? 's' : '') . " en cours, impossible d\x27\xE9teindre\n";
+            }
+        }
+        if ($attempts >= $retryMax) {
+            Logger::logEvent($pdo, $host, $action . '_fail', 'cron');
+            $pdo->prepare('DELETE FROM spool WHERE id=?')->execute([$t['id']]);
+            if ($verbose) {
+                if ($isConn) {
+                    echo "Failed - connections active\n";
+                } else {
+                    echo "Failed\n";
+                }
+            }
+        } else {
+            $pdo->prepare('UPDATE spool SET attempts=? WHERE id=?')->execute([$attempts, $t['id']]);
+            if ($verbose) {
+                $msg = 'Retry ' . $attempts;
+                if ($isConn) $msg .= ' (connections active)';
+                echo $msg . "\n";
+            }
+        }
+    }
+}
+?>

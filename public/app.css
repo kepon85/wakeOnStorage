@@ -1,0 +1,59 @@
+body {
+  background-color: #f7f7f7;
+  font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+}
+#energy-info div { font-size: 0.9rem; }
+
+#solar-forecast .forecast-item { min-width: 70px; }
+#solar-forecast .forecast-toggle { cursor: pointer; }
+#solar-forecast {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto;
+  white-space: nowrap;
+  display: block;
+}
+
+footer a {
+  text-decoration: none;
+}
+
+/* Styles moved from index.php */
+.logo-img {
+  max-height: 150px;
+}
+
+#router-actions {
+  max-width: 400px;
+}
+
+#router-actions svg.icon-display-block {
+  display: block;
+}
+
+#on-extend-and-on-with-durantion {
+  min-width: 200px;
+}
+
+#on-duration {
+  min-width: 90px;
+}
+
+#notifications {
+  z-index: 1051;
+}
+
+#router-plan {
+  max-width: 400px;
+}
+
+#loading {
+  z-index: 1060;
+}
+
+#loading img.loading-img {
+  max-width: 175px;
+}
+
+#btn-extend:disabled { cursor: not-allowed; }
