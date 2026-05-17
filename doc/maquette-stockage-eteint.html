@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maquette - Stockage eteint</title>
+  <link rel="stylesheet" href="maquettes-wos.css">
+</head>
+<body>
+  <main class="page-shell">
+    <header class="brandbar">
+      <div class="brand">
+        <img src="WakeOnStorage-FulltLogoBan.png" alt="WakeOnStorage">
+        <div>
+          <h1>Archives CloudGirofle</h1>
+          <p class="muted">Stockage a froid, accessible a la demande</p>
+        </div>
+      </div>
+      <div class="identity">Connecte : david@example.net</div>
+    </header>
+
+    <section class="split">
+      <article class="panel">
+        <p class="eyebrow">Etat du stockage</p>
+        <h2 class="state-title"><span class="dot off"></span> Eteint</h2>
+        <p class="copy">Le stockage n'est pas alimente actuellement. Vous pouvez l'allumer maintenant pour une duree limitee, ou planifier l'acces si le routeur est indisponible.</p>
+
+        <div class="choice-row">
+          <div class="field">
+            <label for="duration">Duree d'acces</label>
+            <select id="duration">
+              <option>30 min</option>
+              <option selected>1 h</option>
+              <option>3 h</option>
+              <option>5 h</option>
+            </select>
+          </div>
+          <button class="btn btn-primary">Allumer maintenant</button>
+        </div>
+
+        <div class="field-grid">
+          <div class="field">
+            <label for="start">Si indisponible, demarrer</label>
+            <select id="start">
+              <option>Des que possible</option>
+              <option>09:00 demain</option>
+              <option>12:00 demain</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="email">Email de notification</label>
+            <input id="email" value="david@example.net">
+          </div>
+        </div>
+      </article>
+
+      <aside class="aside-stack">
+        <article class="panel">
+          <p class="eyebrow">Energie disponible</p>
+          <div class="metric-grid">
+            <div class="metric">
+              <span>Production actuelle</span>
+              <strong>428 W</strong>
+            </div>
+            <div class="metric">
+              <span>Consommation stockage</span>
+              <strong>10 W</strong>
+            </div>
+            <div class="metric">
+              <span>Batterie</span>
+              <strong>78 %</strong>
+            </div>
+            <div class="metric">
+              <span>Soleil restant</span>
+              <strong>4 h 15</strong>
+            </div>
+          </div>
+          <div class="forecast">
+            <div><b>Maintenant</b><span>428 W</span></div>
+            <div><b>+1 h</b><span>390 W</span></div>
+            <div><b>+3 h</b><span>210 W</span></div>
+          </div>
+        </article>
+        <article class="panel notice">
+          En mode solaire strict, seules les durees couvertes par la prevision restent selectionnables.
+        </article>
+      </aside>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maquette - Stockage allume</title>
+  <link rel="stylesheet" href="maquettes-wos.css">
+</head>
+<body class="work-body">
+  <header class="workbar">
+    <div class="workbar-left">
+      <img src="WakeOnStorage-FulltLogoBan.png" alt="WakeOnStorage">
+      <span class="pill"><span class="dot on"></span> Disponible</span>
+      <span class="pill">Extinction dans 1 h 42</span>
+    </div>
+    <div class="workbar-right">
+      <button class="icon-btn" aria-label="Afficher les commandes" onclick="document.querySelector('.drawer').classList.toggle('is-hidden')">☰</button>
+      <a class="icon-btn" href="maquette-stockage-allume-maximise.html" aria-label="Maximiser la fenetre">⤢</a>
+    </div>
+  </header>
+
+  <section class="drawer is-hidden">
+    <div class="drawer-summary">
+      <strong>Archives CloudGirofle</strong>
+      <span class="muted">Solaire prioritaire · 428 W disponibles</span>
+    </div>
+    <select class="toolbar-select">
+      <option>Prolonger de 30 min</option>
+      <option selected>Prolonger de 1 h</option>
+      <option>Prolonger de 3 h</option>
+    </select>
+    <button class="btn btn-primary">Prolonger</button>
+    <button class="btn btn-soft">Eteindre</button>
+  </section>
+
+  <main class="workspace">
+    <section class="browser-frame">
+      <div class="browser-head">
+        <span>/ archives / 2026 /</span>
+        <span>Iframe integree</span>
+      </div>
+      <div class="fake-iframe">
+        <div class="fake-files">
+          <div class="fake-row">
+            <strong>photos-association</strong>
+            <span>Dossier</span>
+            <span>Modifie hier</span>
+          </div>
+          <div class="fake-row">
+            <strong>sauvegarde-compta.tar.zst</strong>
+            <span>18,2 Go</span>
+            <span>12 mai</span>
+          </div>
+          <div class="fake-row">
+            <strong>documents-legaux</strong>
+            <span>Dossier</span>
+            <span>3 mai</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
