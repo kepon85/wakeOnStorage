@@ -493,6 +493,7 @@ var defaultRefreshInterval = refreshInterval;
 var updateInProgress = false;
 var pendingUpdate = false;
 var updateTimer = null;
+var storageActionInProgress = false;
 var routerSince = 0;
 var batterySince = 0;
 var solarSince = 0;
@@ -980,6 +981,11 @@ $(updateAll);
 updateEnergyModeMsg();
 
 function doStorageAction(act, extra) {
+  if (storageActionInProgress) {
+    return;
+  }
+  storageActionInProgress = true;
+  $('.js-btn-on, .js-btn-off, .js-btn-extend').prop('disabled', true);
   $('#loading-text').text('Action demandée, merci de patienter...');
   $('#loading').removeClass('d-none');
   var data = {action: act};
@@ -1032,6 +1038,10 @@ function doStorageAction(act, extra) {
       }
     }
   }, 'json').always(function(){
+    storageActionInProgress = false;
+    if (!waitStatus) {
+      $('.js-btn-on, .js-btn-off, .js-btn-extend').prop('disabled', false);
+    }
     if (!waitStatus) $('#loading').addClass('d-none');
   });
 }
