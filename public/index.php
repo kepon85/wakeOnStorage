@@ -339,10 +339,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
       <?php if (!empty($cfg['interface']['logo'])): ?>
         <img src="<?= htmlspecialchars($cfg['interface']['logo']) ?>" alt="logo">
       <?php endif; ?>
-      <span class="status-pill"><span class="status-dot"></span><span class="status-label">Statut inconnu</span></span>
+      <span class="status-indicator" title="Statut inconnu"><span class="status-dot"></span></span>
       <span id="work-countdown" class="status-pill d-none"></span>
     </div>
     <div class="workbar-actions">
+      <button class="btn btn-light quick-work-btn js-btn-extend d-none" type="button">Prolonger <span id="quick-extend-duration">1 h</span></button>
+      <button class="btn btn-danger quick-work-btn js-btn-off d-none" type="button">Éteindre</button>
       <button id="toggle-work-controls" class="icon-btn" type="button" aria-label="Afficher les commandes">☰</button>
       <button id="toggle-maximize" class="icon-btn" type="button" aria-label="Maximiser la fenêtre">⤢</button>
     </div>
@@ -358,14 +360,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
       <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?>h</option>
       <?php endforeach; ?>
     </select>
-    <button class="btn btn-primary js-btn-extend d-none" type="button">Prolonger</button>
-    <button class="btn btn-outline-danger js-btn-off d-none" type="button">Éteindre</button>
+    <div class="work-help">La durée sélectionnée est utilisée par le bouton de prolongation.</div>
   </section>
 
   <div id="floating-work-controls" class="floating-work-controls d-none">
     <span id="floating-countdown" class="status-pill d-none"></span>
     <button id="restore-workspace" class="icon-btn" type="button" aria-label="Réduire la fenêtre">⤡</button>
-    <button id="toggle-floating-controls" class="icon-btn" type="button" aria-label="Afficher les commandes">☰</button>
   </div>
 
   <main id="decision-shell" class="page-shell">
@@ -692,6 +692,7 @@ function setUiMode(status) {
 
 function updateStatusLabels(status, text) {
   $('.status-label').text(text);
+  $('.status-indicator').attr('title', text);
 }
 
 function computeSolarHours(forecast) {
@@ -1038,6 +1039,7 @@ function doStorageAction(act, extra) {
 $('.js-duration').on('change', function(){
   var value = $(this).val();
   $('.js-duration').val(value);
+  $('#quick-extend-duration').text(value + ' h');
 });
 
 $('.js-btn-on').on('click', function(e){
@@ -1063,11 +1065,14 @@ function toggleWorkControls() {
   $('#work-controls').toggleClass('is-collapsed');
 }
 
-$('#toggle-work-controls, #toggle-floating-controls').on('click', function(){
+$('#quick-extend-duration').text(($('.js-duration').first().val() || '') + ' h');
+
+$('#toggle-work-controls').on('click', function(){
   toggleWorkControls();
 });
 
 $('#toggle-maximize').on('click', function(){
+  $('#work-controls').addClass('is-collapsed');
   $('body').addClass('workspace-maximized');
 });
 
