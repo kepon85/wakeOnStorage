@@ -77,6 +77,7 @@ storage:
         Content-Type: application/json
         Content-Length: 0
       method: POST
+      timeout: 30
       expected_result:
          status_code: 200
          json:
@@ -98,6 +99,7 @@ storage:
         Content-Type: application/json
         Content-Length: 0
       method: POST
+      timeout: 60
       expected_result:
          status_code: 200
          json:

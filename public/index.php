@@ -339,14 +339,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
       <?php if (!empty($cfg['interface']['logo'])): ?>
         <img src="<?= htmlspecialchars($cfg['interface']['logo']) ?>" alt="logo">
       <?php endif; ?>
-      <span class="status-indicator" title="Statut inconnu"><span class="status-dot"></span></span>
+      <span class="status-indicator" title="Statut inconnu" data-bs-toggle="tooltip" data-bs-title="Statut inconnu"><span class="status-dot"></span></span>
       <span id="work-countdown" class="status-pill d-none"></span>
     </div>
     <div class="workbar-actions">
-      <button class="btn btn-light quick-work-btn js-btn-extend d-none" type="button">Prolonger <span id="quick-extend-duration">1 h</span></button>
-      <button class="btn btn-danger quick-work-btn js-btn-off d-none" type="button">Éteindre</button>
-      <button id="toggle-work-controls" class="icon-btn" type="button" aria-label="Afficher les commandes">☰</button>
-      <button id="toggle-maximize" class="icon-btn" type="button" aria-label="Maximiser la fenêtre">⤢</button>
+      <button class="btn btn-light quick-work-btn js-btn-extend d-none" type="button" data-bs-toggle="tooltip" data-bs-title="Prolonger la durée d’accès sélectionnée">Prolonger <span id="quick-extend-duration">1 h</span></button>
+      <button class="btn btn-danger quick-work-btn js-btn-off d-none" type="button" data-bs-toggle="tooltip" data-bs-title="Programmer l’arrêt du stockage">Éteindre</button>
+      <button id="toggle-work-controls" class="icon-btn" type="button" aria-label="Afficher les commandes" data-bs-toggle="tooltip" data-bs-title="Afficher ou masquer les commandes">☰</button>
+      <button id="toggle-maximize" class="icon-btn" type="button" aria-label="Maximiser la fenêtre" data-bs-toggle="tooltip" data-bs-title="Maximiser l’espace de travail">⤢</button>
     </div>
   </header>
 
@@ -365,7 +365,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
 
   <div id="floating-work-controls" class="floating-work-controls d-none">
     <span id="floating-countdown" class="status-pill d-none"></span>
-    <button id="restore-workspace" class="icon-btn" type="button" aria-label="Réduire la fenêtre">⤡</button>
+    <button id="restore-workspace" class="icon-btn" type="button" aria-label="Réduire la fenêtre" data-bs-toggle="tooltip" data-bs-title="Retrouver la barre d’outils">⤡</button>
   </div>
 
   <main id="decision-shell" class="page-shell">
@@ -402,7 +402,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
               <?php endforeach; ?>
             </select>
           </div>
-          <button class="btn btn-success js-btn-on d-none" type="button">Allumer maintenant</button>
+          <button class="btn btn-success js-btn-on d-none" type="button" data-bs-toggle="tooltip" data-bs-title="Allumer le stockage pour la durée sélectionnée">Allumer maintenant</button>
         </div>
 
         <form id="router-plan" method="post" class="router-plan d-none">
@@ -432,8 +432,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
             </div>
           </div>
           <div class="schedule-actions">
-            <button type="submit" id="schedule_router" name="schedule_router" class="btn btn-primary">Planifier l’allumage</button>
-            <button type="button" id="cancel-start" class="btn btn-outline-danger d-none">Annuler la demande</button>
+            <button type="submit" id="schedule_router" name="schedule_router" class="btn btn-primary" data-bs-toggle="tooltip" data-bs-title="Envoyer une demande d’allumage planifiée">Planifier l’allumage</button>
+            <button type="button" id="cancel-start" class="btn btn-outline-danger d-none" data-bs-toggle="tooltip" data-bs-title="Annuler la demande d’allumage en attente">Annuler la demande</button>
           </div>
         </form>
         <div id="decision-post-content" class="decision-post-content"></div>
@@ -487,6 +487,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['schedule_router'])) {
 var wosApiToken = <?= json_encode($apiToken) ?>;
 var currentUser = <?= json_encode($authenticatedUser) ?>;
 var currentIp = <?= json_encode($_SERVER['REMOTE_ADDR'] ?? '') ?>;
+var currentHost = <?= json_encode($host) ?>;
 var refreshInterval = <?= $refresh ?> * 1000;
 var refreshLoadingInterval = <?= $refreshLoading ?> * 1000;
 var defaultRefreshInterval = refreshInterval;
@@ -522,6 +523,8 @@ var storageUpTimeout = <?php echo (int)($cfg['storage']['up']['timeout'] ?? 0); 
 var storageDownTime = <?php echo (int)($cfg['storage']['down']['time'] ?? 0); ?>;
 var storageDownTimeout = <?php echo (int)($cfg['storage']['down']['timeout'] ?? 0); ?>;
 var waitStatus = null;
+var floatingControlsStorageKey = 'wos:floating-controls:' + currentHost;
+var floatingControlsDrag = null;
 
 function showPostUp() {
   if (!storagePostUp || storagePostUpShown) return;
@@ -694,6 +697,114 @@ function setUiMode(status) {
 function updateStatusLabels(status, text) {
   $('.status-label').text(text);
   $('.status-indicator').attr('title', text);
+  $('.status-indicator').attr('data-bs-title', text).each(function(){
+    var tooltip = bootstrap.Tooltip.getInstance(this);
+    if (tooltip) {
+      tooltip.setContent({'.tooltip-inner': text});
+    }
+  });
+}
+
+function readFloatingControlsPosition() {
+  try {
+    var raw = localStorage.getItem(floatingControlsStorageKey);
+    if (!raw) return null;
+    var pos = JSON.parse(raw);
+    if (typeof pos.left !== 'number' || typeof pos.top !== 'number') return null;
+    return pos;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveFloatingControlsPosition(left, top) {
+  try {
+    localStorage.setItem(floatingControlsStorageKey, JSON.stringify({left: left, top: top}));
+  } catch (e) {}
+}
+
+function clampFloatingControlsPosition(left, top) {
+  var el = document.getElementById('floating-work-controls');
+  if (!el) return null;
+  var margin = 8;
+  var width = el.offsetWidth || 48;
+  var height = el.offsetHeight || 48;
+  var maxLeft = Math.max(margin, window.innerWidth - width - margin);
+  var maxTop = Math.max(margin, window.innerHeight - height - margin);
+  return {
+    left: Math.min(Math.max(left, margin), maxLeft),
+    top: Math.min(Math.max(top, margin), maxTop)
+  };
+}
+
+function setFloatingControlsPosition(left, top, persist) {
+  var el = document.getElementById('floating-work-controls');
+  var pos = clampFloatingControlsPosition(left, top);
+  if (!el || !pos) return;
+  el.style.left = pos.left + 'px';
+  el.style.top = pos.top + 'px';
+  el.style.right = 'auto';
+  if (persist) saveFloatingControlsPosition(pos.left, pos.top);
+}
+
+function restoreFloatingControlsPosition() {
+  window.requestAnimationFrame(function(){
+    var el = document.getElementById('floating-work-controls');
+    if (!el) return;
+    var pos = readFloatingControlsPosition();
+    if (pos) {
+      setFloatingControlsPosition(pos.left, pos.top, true);
+      return;
+    }
+    if (!$('body').hasClass('workspace-maximized')) return;
+    var rect = el.getBoundingClientRect();
+    setFloatingControlsPosition(rect.left, rect.top, false);
+  });
+}
+
+function isFloatingControlsDragHandle(event) {
+  var el = document.getElementById('floating-work-controls');
+  if (!el || event.button !== 0) return false;
+  if (event.target.closest('button, a, input, select, textarea, .status-pill')) return false;
+  var rect = el.getBoundingClientRect();
+  var edge = 14;
+  var x = event.clientX - rect.left;
+  var y = event.clientY - rect.top;
+  return event.target === el || x <= edge || x >= rect.width - edge || y <= edge || y >= rect.height - edge;
+}
+
+function initFloatingControlsDrag() {
+  var el = document.getElementById('floating-work-controls');
+  if (!el) return;
+  el.addEventListener('pointerdown', function(event){
+    if (!isFloatingControlsDragHandle(event)) return;
+    var rect = el.getBoundingClientRect();
+    floatingControlsDrag = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top
+    };
+    el.classList.add('is-dragging');
+    el.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+  el.addEventListener('pointermove', function(event){
+    if (!floatingControlsDrag || floatingControlsDrag.pointerId !== event.pointerId) return;
+    setFloatingControlsPosition(event.clientX - floatingControlsDrag.offsetX, event.clientY - floatingControlsDrag.offsetY, false);
+  });
+  ['pointerup', 'pointercancel'].forEach(function(eventName){
+    el.addEventListener(eventName, function(event){
+      if (!floatingControlsDrag || floatingControlsDrag.pointerId !== event.pointerId) return;
+      floatingControlsDrag = null;
+      el.classList.remove('is-dragging');
+      var rect = el.getBoundingClientRect();
+      setFloatingControlsPosition(rect.left, rect.top, true);
+    });
+  });
+  window.addEventListener('resize', function(){
+    var pos = readFloatingControlsPosition();
+    if (pos) setFloatingControlsPosition(pos.left, pos.top, true);
+  });
 }
 
 function computeSolarHours(forecast) {
@@ -890,9 +1001,11 @@ function updateAll() {
                 var remainingLabel = formatRemaining(scheduledDownDate);
                 statusMsg = "Le stockage est allumé et accessible. Il s’arrêtera automatiquement dans " + remainingLabel + ".";
                 $('#work-countdown, #floating-countdown').removeClass('d-none').text('Extinction dans ' + remainingLabel);
+                if ($('body').hasClass('workspace-maximized')) restoreFloatingControlsPosition();
             } else {
                 statusMsg = "Le stockage est allumé.";
                 $('#work-countdown, #floating-countdown').addClass('d-none').text('');
+                if ($('body').hasClass('workspace-maximized')) restoreFloatingControlsPosition();
             }
             $('#decision-status-copy').text(statusMsg);
             updateStatusLabels('up', 'Disponible');
@@ -1084,6 +1197,7 @@ $('#toggle-work-controls').on('click', function(){
 $('#toggle-maximize').on('click', function(){
   $('#work-controls').addClass('is-collapsed');
   $('body').addClass('workspace-maximized');
+  restoreFloatingControlsPosition();
 });
 
 $('#restore-workspace').on('click', function(){
@@ -1103,6 +1217,7 @@ $('#cancel-start').on('click', function(e){
 document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el){
   new bootstrap.Tooltip(el);
 });
+initFloatingControlsDrag();
 </script>
 <script src="app.js"></script>
 </body>
